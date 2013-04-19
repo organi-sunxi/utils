@@ -209,7 +209,7 @@ int main(int argc, char* argv[])
 	rename(outfilename, TMPFILE_NAME);
 
 	if(uimage){
-		sprintf(bmp, "mkimage -A arm -C none -a 0x%lx -n splash -d "TMPFILE_NAME" %s", loadaddr, outfilename);
+		sprintf(bmp, "mkimage -A arm -C none -a 0x%lx -n splash -d "TMPFILE_NAME" u%s", loadaddr, outfilename);
 		system(bmp);
 		unlink(TMPFILE_NAME);
 	}
