@@ -40,6 +40,7 @@ static void vfsmount()
 //	mount("","/proc","proc",MS_NOSUID,"");
 	mount("devtmpfs", "/dev", "devtmpfs", MS_NOSUID, NULL);
 	mount(NULL, "/sys", "sysfs", MS_NOSUID, NULL);
+	mount(NULL, "/tmp", "ramfs", MS_NOSUID, NULL);
 }
 
 static void vfsumount()
