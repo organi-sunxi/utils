@@ -1,6 +1,6 @@
 
-#CC=arm-none-linux-gnueabi-
-CC=arm-unknown-linux-uclibcgnueabi-
+CC=arm-linux-gnueabi-
+#CC=arm-unknown-linux-uclibcgnueabi-
 CFLAGS=-DINITROOT_STARTUP
 LDFLAGS=-static
 
