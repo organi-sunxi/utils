@@ -14,7 +14,7 @@ $(EXEC): initroot_startup.c initroot_startup.h
 #	$(CC)ar c lib$(EXEC).a $(EXEC).o
 
 main: main.cpp
-	$(CC)gcc main.cpp $(LDFLAGS) $(CFLAGS) -o init -linitroot_startup -L./
+	$(CC)g++ main.cpp $(LDFLAGS) $(CFLAGS) -o init -linitroot_startup -L./
 	$(CC)strip -S init
 
 clean:
