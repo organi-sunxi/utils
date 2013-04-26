@@ -3,7 +3,7 @@ LDFLAG=
 
 all: mksplash
 
-mkcov: 
+mksplash: 
 	$(CC) mksplash.c $(LDFLAG) -o mksplash $(EXTRA_LIBS)
 
 clean:
