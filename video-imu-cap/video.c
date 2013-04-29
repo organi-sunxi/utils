@@ -104,6 +104,8 @@ struct video_dev
 	struct buf_info buff_info[CAPTURE_MAX_BUFFER];
 	int numbuffer;
 
+	unsigned int cap_everyfrm;	//capture every n frm, 0 for every frm
+	unsigned int maxfrm;	//max capture frame
 };
 static struct video_dev videodev={.fd=-1, };
 
@@ -310,8 +312,10 @@ static int initCapture(const char *dev, struct video_dev *pvdev)
 
 	}
 
-	LOG("cap size %d x %d offset: %x, %x, fmt=%s\n", 
-		fmt.fmt.pix.width, fmt.fmt.pix.height, pvdev->offset[0], pvdev->offset[1], format_name(fmt.fmt.pix.pixelformat));
+	pvdev->maxfrm = pvdev->maxfrm*1024*1024/(pvdev->offset[0]*3/4);
+
+	LOG("cap size %d x %d offset: %x, maxfrm=%d, fmt=%s\n", 
+		fmt.fmt.pix.width, fmt.fmt.pix.height, pvdev->offset[0], pvdev->maxfrm, format_name(fmt.fmt.pix.pixelformat));
 
 	video_hd.width = fmt.fmt.pix.width;
 	video_hd.height = fmt.fmt.pix.height/2;
@@ -613,8 +617,9 @@ static void write_file(char *p, struct video_dev *pvdev)
 
 static inline int video_cap_frame(struct display_dev *pddev, struct video_dev *pvdev)
 {
-	int ret;
+	int ret, save;
 	struct v4l2_buffer buf;
+	static unsigned int frame_cnt=0;
 
 	memset(&buf, 0, sizeof(buf));
 	buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -635,18 +640,24 @@ static inline int video_cap_frame(struct display_dev *pddev, struct video_dev *p
 		LOG("Cap VIDIOC_DQBUF");
 		return ret;
 	}
-
+	frame_cnt++;
+	save = ((frame_cnt%pvdev->cap_everyfrm)==0);
+	if((frame_cnt%25)==0)
+		LOG("vf %d, if %d\r", frame_cnt, get_imu_nframe());
+	
 	if(capfile){
-		char *p = pvdev->buff_info[buf.index].start;
-//		int framesize = pvdev->offset[0];
-		video_hd.nframe++;
+		if(save){
+			char *p = pvdev->buff_info[buf.index].start;
+			
+			video_hd.nframe++;
 
-		if((video_hd.nframe%25)==0)
-			LOG("vf %d, if %d\r", video_hd.nframe, get_imu_nframe());
+			//write timestamp
+			fwrite(&buf.timestamp, sizeof(struct timeval), 1, capfile);
+			write_file(p, pvdev);
 
-		//write timestamp
-		fwrite(&buf.timestamp, sizeof(struct timeval), 1, capfile);
-		write_file(p, pvdev);
+			if(pvdev->maxfrm!=0 && video_hd.nframe >= pvdev->maxfrm)	//stop
+				return -1;
+		}
 	}
 
 #ifdef LOGTIME
@@ -751,7 +762,7 @@ int video_run(void)
 	return 0;
 }
 
-int video_start(PVideo_st2 pvst)
+int video_start(PVideo_st2 pvst, unsigned int e, unsigned int maxsize)
 {
 	pthread_mutexattr_t attr;
 	Prect_st pshow, pcrop;
@@ -773,6 +784,11 @@ int video_start(PVideo_st2 pvst)
 	memcpy(&dispdev.crop, pcrop, sizeof(rect_st));
 
 	videodev.channel = video_thd.channel = pvst->channel;
+	videodev.maxfrm = maxsize; //temp saved, we will calculate when initialze video device
+
+	if(e==0)
+		e++;
+	videodev.cap_everyfrm = e;
 
 	if(video_thd.video_running){
 		video_stop();

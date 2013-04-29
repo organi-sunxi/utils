@@ -45,7 +45,7 @@ static int open_serial(char *serial_dev, speed_t rate)
 	newtio.c_iflag = IGNPAR; /*input flag*/
 	newtio.c_oflag = 0;		/*output flag*/
  	newtio.c_lflag = ICANON;	//enable line input
- 	newtio.c_cc[VMIN]=1;
+ 	newtio.c_cc[VMIN]=0;
 	newtio.c_cc[VTIME]=0;
 
 	cfsetispeed(&newtio, rate);
@@ -68,7 +68,7 @@ static void close_serial()
 static void* imu_cap_thread(void* v)
 {
 	char serial_buffer[BUFSIZE];
-	int ret;
+	int ret, gx, gy, gz, ax, ay, az, mx, my, mz;
 	imu_frame frame;
 
 	if(!pimufile)
@@ -83,20 +83,32 @@ static void* imu_cap_thread(void* v)
 		pthread_testcancel();
 		ret = read (serial_fd, serial_buffer, BUFSIZE);
 		if(ret<=0){
+			LOG("serial ret=%d\n", ret);
 			return NULL;
 		}
 
 		ret = sscanf(serial_buffer, "%d,%d,%d;%d,%d,%d;%d,%d,%d", 
-			&frame.gyro_x, &frame.gyro_y, &frame.gyro_z,
-			&frame.accel_x, &frame.accel_y, &frame.accel_z,
-			&frame.mag_x, &frame.mag_y, &frame.mag_z);
+			&gx, &gy, &gz, &ax, &ay, &az, &mx, &mx, &mx);
 
-		if(ret!=9)	//bad frame
+		frame.gyro_x = gx;
+		frame.gyro_y = gy;
+		frame.gyro_z = gz;
+		frame.accel_x = ax;
+		frame.accel_y = ay;
+		frame.accel_z = az;
+		frame.mag_x = mx;
+		frame.mag_y = my;
+		frame.mag_z = mz;
+
+		if(ret!=9){	//bad frame
+			LOG("bad frame:%s\n", serial_buffer);
 			continue;
+		}
 
 		gettimeofday(&frame.ts, NULL);
 		imu_hd.nframe++;
 		fwrite(&frame, sizeof(frame), 1, pimufile);
+
 	}
 
 	return NULL;

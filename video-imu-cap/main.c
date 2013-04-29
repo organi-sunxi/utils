@@ -24,21 +24,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <unistd.h>
+#include <getopt.h>
 
 #include "imu.h"
 #include "video.h"
 
 static void print_usage(char* name)
 {
-	printf("Usage: %s <capture file>\n", name);
+	printf("Usage: %s [optional] <capture file>\n", name);
+	printf("\t-h \t show this help\n");
+	printf("\t-e n\t video capture every n frame\n");
+	printf("\t-m n\t Max video file size(MByte)\n");
 }
 
 int main(int argc, char** argv)
 {
 	char vfname[128], ifname[128], *p=vfname;
 	FILE *vfile=NULL, *ifile=NULL;
+	int c;
+	unsigned int e=1, m=0;
 
 	Video_st2 vst={
 		.channel = 0,
@@ -56,12 +61,29 @@ int main(int argc, char** argv)
 		},
 	};
 
-	if(argc<=1 || strcmp(argv[1],"-h")==0){
+	if(argc<=1){
 		print_usage(argv[0]);
 		return 0;
 	}
-	sprintf(vfname, "%sv", argv[1]);
-	sprintf(ifname, "%si", argv[1]);
+
+
+	while(( c = getopt(argc, argv, "he:m:"))!= -1){
+		switch(c){
+		case 'e':
+			e = strtol(optarg, NULL, 0);
+			break;
+		case 'm':
+			m = strtol(optarg, NULL, 0);
+			break;
+		case 'h':
+		default:
+			print_usage(argv[0]);
+			return 0;
+		}
+	}
+ 	
+	sprintf(vfname, "%sv", argv[optind]);
+	sprintf(ifname, "%si", argv[optind]);
 
 	vfile = fopen(vfname, "w");
 	if(vfile == NULL){
@@ -78,7 +100,7 @@ int main(int argc, char** argv)
 	
 	video_init(stderr, vfile);
 	imu_init(stderr, ifile);
-	video_start(&vst);
+	video_start(&vst,e,m);
 	imu_start();
 
 	printf("press \'stop\' to stop capture\n");
