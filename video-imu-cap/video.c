@@ -542,7 +542,7 @@ static int Getfb_info(char *dev)
 	return 0;
 }
 
-static int disp_set_addr(struct display_dev *pddev, struct video_dev *pvdev, int *addr)
+static int disp_set_addr(struct display_dev *pddev, struct video_dev *pvdev, unsigned long addr)
 {
 	unsigned long arg[4];
 
@@ -552,9 +552,9 @@ static int disp_set_addr(struct display_dev *pddev, struct video_dev *pvdev, int
 	fb_addr.interlace		= 0;
 	fb_addr.top_field_first = 0;
 	fb_addr.frame_rate		= 25;
-	fb_addr.addr[0] = *addr; //your Y address
-	fb_addr.addr[1] = *addr + pvdev->offset[0];//your C address
-	fb_addr.addr[2] = *addr + pvdev->offset[1];//your C address
+	fb_addr.addr[0] = addr; //your Y address
+	fb_addr.addr[1] = addr + pvdev->offset[0];//your C address
+	fb_addr.addr[2] = addr + pvdev->offset[1];//your C address
 
 	fb_addr.id = 0;  //TODO
 
@@ -656,7 +656,7 @@ static inline int video_cap_frame(struct display_dev *pddev, struct video_dev *p
 	ltime = ctime;
 #endif
 
-	disp_set_addr(pddev,pvdev,&buf.m.offset);
+	disp_set_addr(pddev,pvdev,(unsigned long)buf.m.offset);
 
 #ifdef LOGTIME
 	gettimeofday( &ctime, NULL );
