@@ -24,6 +24,7 @@
 
 #include "mon-server.h"
 #include "video.h"
+#include "imu.h"
 #include "capfile.h"
 #include <video/sunxi_disp_ioctl.h>
 
@@ -641,7 +642,7 @@ static inline int video_cap_frame(struct display_dev *pddev, struct video_dev *p
 		video_hd.nframe++;
 
 		if((video_hd.nframe%25)==0)
-			LOG("frame %d\r", video_hd.nframe);
+			LOG("vf %d, if %d\r", video_hd.nframe, get_imu_nframe());
 
 		//write timestamp
 		fwrite(&buf.timestamp, sizeof(struct timeval), 1, capfile);

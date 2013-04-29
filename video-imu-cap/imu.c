@@ -27,38 +27,9 @@ FILE *plogfile=NULL, *pimufile=NULL;
 
 #define ARRAY_SIZE(a)	(sizeof(a)/sizeof(*(a)))
 
-static void* imu_cap_thread(void* v)
+unsigned int get_imu_nframe(void)
 {
-	char serial_buffer[BUFSIZE];
-	int ret;
-	imu_frame frame;
-
-	if(!pimufile)
-		return NULL;
-
-	imu_hd.nframe = 0;
-
-	for(;;){
-		pthread_testcancel();
-		ret = read (serial_fd, serial_buffer, BUFSIZE);
-		if(ret<=0){
-			return NULL;
-		}
-
-		ret = sscanf(serial_buffer, "%d,%d,%d;%d,%d,%d;%d,%d,%d", 
-			&frame.gyro_x, &frame.gyro_y, &frame.gyro_z,
-			&frame.accel_x, &frame.accel_y, &frame.accel_z,
-			&frame.mag_x, &frame.mag_y, &frame.mag_z);
-
-		if(ret!=9)	//bad frame
-			continue;
-
-		gettimeofday(&frame.ts, NULL);
-		imu_hd.nframe++;
-		fwrite(&frame, sizeof(frame), 1, pimufile);
-	}
-
-	return NULL;
+	return imu_hd.nframe;
 }
 
 static struct termios oldtio,newtio;
@@ -94,6 +65,43 @@ static void close_serial()
 	close(serial_fd);
 }
 
+static void* imu_cap_thread(void* v)
+{
+	char serial_buffer[BUFSIZE];
+	int ret;
+	imu_frame frame;
+
+	if(!pimufile)
+		return NULL;
+
+	imu_hd.nframe = 0;
+
+	if(open_serial(SERIAL_DEV, SERIAL_BAUDRATE)<0)
+		return NULL;
+
+	for(;;){
+		pthread_testcancel();
+		ret = read (serial_fd, serial_buffer, BUFSIZE);
+		if(ret<=0){
+			return NULL;
+		}
+
+		ret = sscanf(serial_buffer, "%d,%d,%d;%d,%d,%d;%d,%d,%d", 
+			&frame.gyro_x, &frame.gyro_y, &frame.gyro_z,
+			&frame.accel_x, &frame.accel_y, &frame.accel_z,
+			&frame.mag_x, &frame.mag_y, &frame.mag_z);
+
+		if(ret!=9)	//bad frame
+			continue;
+
+		gettimeofday(&frame.ts, NULL);
+		imu_hd.nframe++;
+		fwrite(&frame, sizeof(frame), 1, pimufile);
+	}
+
+	return NULL;
+}
+
 static pthread_t th_imu;
 
 int imu_stop(void)
@@ -126,9 +134,6 @@ int imu_init(FILE *log, FILE *ifile)
 	plogfile = log;
 	pimufile = ifile;
 	
-	if(open_serial(SERIAL_DEV, SERIAL_BAUDRATE)<0)
-		return -1;
-
 	return 0;
 }
 

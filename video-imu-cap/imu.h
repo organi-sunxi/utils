@@ -4,5 +4,6 @@
 int imu_stop(void);
 void imu_start(void);
 int imu_init(FILE *log, FILE *ifile);
+unsigned int get_imu_nframe(void);
 
 #endif
