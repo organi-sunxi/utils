@@ -22,6 +22,7 @@
 #include <string.h>
 #include <sys/mount.h>
 #include <linux/fb.h>
+#include <linux/sched.h>
 #include "initroot_startup.h"
 
 #define FBDEV		"/dev/fb0"
@@ -205,10 +206,6 @@ int startup_begin(int *argc, char ***argv)
 	mkInitNodes();
 	register_exit_signal();
 	
-	//mount user data
-	if(mount("/dev/mtdblock5", "/data","yaffs",0, NULL)<0)
-		printf("mount usr data error %d\n", errno);
-
 	SetQtEnv();
 
 	return 0;
