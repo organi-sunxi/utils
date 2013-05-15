@@ -40,7 +40,7 @@ static void print_usage(char* name)
 
 int main(int argc, char** argv)
 {
-	char vfname[128], ifname[128], *p=vfname;
+	char vfname[128], ifname[128], *p=vfname, picture_dir[128], *picture_save = NULL;
 	FILE *vfile=NULL, *ifile=NULL;
 	int c;
 	unsigned int e=1, m=0;
@@ -67,13 +67,17 @@ int main(int argc, char** argv)
 	}
 
 
-	while(( c = getopt(argc, argv, "he:m:"))!= -1){
+	while(( c = getopt(argc, argv, "he:m:s:"))!= -1){
 		switch(c){
 		case 'e':
 			e = strtol(optarg, NULL, 0);
 			break;
 		case 'm':
 			m = strtol(optarg, NULL, 0);
+			break;
+		case 's':
+			strncpy(picture_dir, optarg, 128);
+			picture_save = picture_dir;
 			break;
 		case 'h':
 		default:
@@ -97,8 +101,8 @@ int main(int argc, char** argv)
 		fclose(vfile);
 		return -1;
 	}
-	
-	video_init(stderr, vfile);
+
+	video_init(stderr, vfile, picture_save);
 	imu_init(stderr, ifile);
 	video_start(&vst,e,m);
 	imu_start();
@@ -109,6 +113,8 @@ int main(int argc, char** argv)
 		gets(p);
 		if(strcmp(p, "stop")==0)
 			break;
+		if(strcmp(p, "shot")==0)
+			shot_frame = 1;
 	}
 	video_stop();
 	imu_stop();

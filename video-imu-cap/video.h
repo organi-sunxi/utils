@@ -3,10 +3,12 @@
 
 #include "mon-server.h"
 
+extern int shot_frame;
+
 int video_start(PVideo_st2 pvst, unsigned int e, unsigned int maxsize);
 int video_stop(void);
 int video_pause(void);
 int video_run(void);
-int video_init(FILE *log, FILE *cap);
+int video_init(FILE *log, FILE *cap, char *dir);
 
 #endif

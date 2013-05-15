@@ -50,6 +50,10 @@
 #define LOG(fmt, x...)	if(logfile) fprintf(logfile, fmt, ## x)
 static FILE *logfile=NULL, *capfile=NULL;
 
+static char *save_dir = NULL;
+static int save_seq = 0;
+int shot_frame = 0;
+
 static video_head video_hd={VIDEO_MAGIC,};
 
 
@@ -660,6 +664,22 @@ static inline int video_cap_frame(struct display_dev *pddev, struct video_dev *p
 		}
 	}
 
+	if (save_dir && shot_frame) {
+		char *p = pvdev->buff_info[buf.index].start;
+		char pfile[128];
+		FILE *f;
+		snprintf(pfile, 128, "%s/%d.yuv", save_dir, save_seq);
+		f = fopen(pfile, "w");
+		if (f == NULL) {
+			printf("can't open file %s to save frame shot\n", pfile);
+			return -1;
+		}
+		fwrite(p, pvdev->cap_width, pvdev->cap_height * 3 / 2, f);
+		fclose(f);
+		save_seq++;
+		shot_frame = 0;
+	}
+
 #ifdef LOGTIME
 	gettimeofday( &ctime, NULL );
 	LOG("DQ cap: %ld(%ld)\n", 
@@ -825,7 +845,7 @@ int video_stop(void)
 	return 0;
 }
 
-int video_init(FILE *log, FILE *cap)
+int video_init(FILE *log, FILE *cap, char *dir)
 {
 	logfile = log;
 	if(cap){
@@ -833,6 +853,8 @@ int video_init(FILE *log, FILE *cap)
 		//skip head, write it when closed
 		fseek(cap, sizeof(video_hd), SEEK_SET);
 	}
+
+	save_dir = dir;
 
 	video_thd.video_running = 0;
 	if(Getfb_info(DEFAULT_FB_DEVICE)<0)

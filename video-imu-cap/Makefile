@@ -1,6 +1,6 @@
-CC := arm-none-linux-gnueabi-gcc
-LINUX_DIR=../../linux-sunxi
-CFLAGS := -I$(LINUX_DIR)/include
+CC ?= arm-none-linux-gnueabi-gcc
+LINUX_DIR ?= ../../linux-sunxi
+CFLAGS := -I$(LINUX_DIR)/include -static 
 TARGET := vicap
 EXTRA_LIBS += -lpthread
 SRC = main.c imu.c video.c
