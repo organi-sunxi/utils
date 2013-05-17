@@ -8,9 +8,9 @@
 #include <sys/ioctl.h>
 #include <net/if_arp.h>
 #include <linux/if.h>
-#include "operator_machine.h"
+#include "command.h"
 
-void get_mac(int argc, char *argv[])
+static void get_mac(int argc, char *argv[])
 {
 	printf("get_mac\n");
 #if 0
@@ -65,8 +65,9 @@ void get_mac(int argc, char *argv[])
 	close(res);
 #endif
 }
+BUILDIN_CMD("get-mac", get_mac);
 
-void set_mac(int argc, char *argv[])
+static void set_mac(int argc, char *argv[])
 {
 #if 0
 	struct ifreq ifr_mac;
@@ -123,8 +124,9 @@ void set_mac(int argc, char *argv[])
 	printf("sucess\n");
 #endif
 }
+BUILDIN_CMD("set-mac", set_mac);
 
-void get_ip(int argc, char *argv[])
+static void get_ip(int argc, char *argv[])
 {
 	/*
 	struct ifreq ifr_ip;
@@ -153,8 +155,9 @@ void get_ip(int argc, char *argv[])
 	close(res);
 	*/
 }
+BUILDIN_CMD("get-ip", get_ip);
 
-void set_ip(int argc, char *argv[])
+static void set_ip(int argc, char *argv[])
 {
 	/*
 	struct sockaddr_in sin;
@@ -191,43 +194,51 @@ void set_ip(int argc, char *argv[])
 	printf("sucess\n");
 	*/
 }
+BUILDIN_CMD("set-ip", set_ip);
 
-void get_lcd(int argc, char *argv[])
+static void get_lcd(int argc, char *argv[])
 {
 	printf("get lcd\n");
 }
+BUILDIN_CMD("get-lcd", get_lcd);
 
-void set_lcd(int argc, char *argv[])
+static void set_lcd(int argc, char *argv[])
 {
 	printf("set lcd\n");
 }
+BUILDIN_CMD("set-lcd", set_lcd);
 
-void list_lcd(int argc, char *argv[])
+static void list_lcd(int argc, char *argv[])
 {
 	printf("list lcd\n");
 }
+BUILDIN_CMD("list-lcd", list_lcd);
 
-void get_rotation(int argc, char *argv[])
+static void get_rotation(int argc, char *argv[])
 {
 	printf("get rotation\n");
 }
+BUILDIN_CMD("get-rotation", get_rotation);
 
-void set_rotation(int argc, char *argv[])
+static void set_rotation(int argc, char *argv[])
 {
 	printf("set rotation\n");
 }
+BUILDIN_CMD("set-rotation", set_rotation);
 
-void get_splash(int argc, char *argv[])
+static void get_splash(int argc, char *argv[])
 {
 	printf("get splash\n");
 }
-
-void set_splash(int argc, char *argv[])
+BUILDIN_CMD("get-splash", get_splash);
+	
+static void set_splash(int argc, char *argv[])
 {
 	printf("set splash\n");
 }
+BUILDIN_CMD("set-splash", set_splash);
 
-void get_date(int argc, char *argv[])
+static void get_date(int argc, char *argv[])
 {
 	/*
 	time_t timep;
@@ -241,8 +252,9 @@ void get_date(int argc, char *argv[])
 	printf("%s\n", strtime);
 	*/
 }
+BUILDIN_CMD("get-date", get_date);
 
-void set_date(int argc, char *argv[])
+static void set_date(int argc, char *argv[])
 {
 	/*
 	time_t timep;
@@ -273,8 +285,9 @@ void set_date(int argc, char *argv[])
 	printf("success\n");
 	*/
 }
+BUILDIN_CMD("set-date", set_date);
 
-void get_host(int argc, char *argv[])
+static void get_host(int argc, char *argv[])
 {
 /*
 	char hostname[50];
@@ -287,8 +300,9 @@ void get_host(int argc, char *argv[])
 	printf("%s\n", hostname);	
 */
 }
+BUILDIN_CMD("get-host", get_host);
 
-void set_host(int argc, char *argv[])
+static void set_host(int argc, char *argv[])
 {
 /*
 	if (sethostname(parameter, strlen(parameter)) < 0) {
@@ -298,3 +312,5 @@ void set_host(int argc, char *argv[])
 */
 	printf("success\n");
 }
+BUILDIN_CMD("set-host", set_host);
+

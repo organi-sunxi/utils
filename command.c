@@ -2,60 +2,41 @@
 #include <string.h>
 #include <stdlib.h>
 #include "command.h"
-#include "operator_lib.h"
-#include "operator_machine.h"
-#include "operator_app.h"
 
 #define MAX_ARGS 50
 
-
-static void help(int argc, char *argv[]);
-static void version(int argc, char *argv[]);
-static void reboot(int argc, char *argv[]);
-
-static command_t s_command[] = {
-	{"help", help},
-	{"version", version},
-	{"reboot", reboot},
-	{"md5sum", md5sum},
-	{"update-lib", update_lib},
-	{"get-mac", get_mac},
-	{"set-mac", set_mac},
-	{"get-ip", get_ip},
-	{"set-ip", set_ip},
-	{"get-date", get_date},
-	{"set-date", set_date},
-	{"get-host", get_host},
-	{"set-host", set_host},
-	{"get-splash", get_splash},
-	{"set-splash", set_splash},
-	{"get-lcd", get_lcd},
-	{"set-lcd", set_lcd},
-	{"list-lcd", list_lcd},
-	{"get-rotation", get_rotation},
-	{"set-rotation", set_rotation},
-	{"run", run},
-	{"update-app", update_app},
-	{"run-startup-app", run_startup_app},
-	{"update-fastapp", update_fastapp},
-	{"remove-fastapp", remove_fastapp},
-	{"update-fw", update_fw}
-};
+extern command_t __start_buildin_cmd[];
+extern command_t __stop_buildin_cmd[];
 
 static void help(int argc, char *argv[])
 {
-	printf("EMconfig Help\n");
+	//list command
+	command_t *cmd;
+	for (cmd = __start_buildin_cmd; cmd < __stop_buildin_cmd; cmd++){
+		printf("%s\n", cmd->command);
+	}
 }
+BUILDIN_CMD("help", help);
 
 static void version(int argc, char *argv[])
 {
 	printf("version 1.0.12\n");
 }
+BUILDIN_CMD("version", version);
 
 static void reboot(int argc, char *argv[])
 {
 	printf("reboot\n");
 }
+BUILDIN_CMD("reboot", reboot);
+
+static void exit_cmd(int argc, char *argv[])
+{
+	printf("exit\n");
+	exit(0);
+}
+BUILDIN_CMD("exit", exit_cmd);
+
 
 #define STATE_WHITESPACE (0)
 #define STATE_WORD (1)
@@ -93,21 +74,20 @@ void deal_command(char *cmdline)
 	int argc;
 	int i;
 
+	command_t *cmd;
+
 	memset(argv, 0, sizeof(argv));
 	parse_args(cmdline, &argc, argv);
 	
-	for (i = 0; i < sizeof(s_command) / sizeof(command_t); i++)
+	for (cmd = __start_buildin_cmd; cmd < __stop_buildin_cmd; cmd++)
 	{
-		if (!strcmp(argv[0], s_command[i].command)) {
-			index = i;
+		if (!strcmp(argv[0], cmd->command)) {
+			cmd->fun(argc, argv);
+			return;
 		}
 	}
 
-	if (index == -1) {
-		printf("There is no %s command!\n", argv[0]);
-		return;
-	}
-
-	s_command[index].fun(argc, argv);
+	printf("no %s command!\n", argv[0]);
+	
 }
 

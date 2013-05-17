@@ -1,31 +1,39 @@
 #include <stdio.h>
+#include "command.h"
 
-void run(int argc, char *argv[])
+static void run(int argc, char *argv[])
 {
 	printf("run\n");
 }
-
-void update_app(int argc, char *argv[])
+BUILDIN_CMD("run", run);
+	
+static void update_app(int argc, char *argv[])
 {
 	printf("update app\n");
 }
+BUILDIN_CMD("update-app", update_app);
 
-void run_startup_app(int argc, char *argv[])
+static void run_startup_app(int argc, char *argv[])
 {
 	printf("run startup app\n");
 }
+BUILDIN_CMD("run-startup-app", run_startup_app);
 
-void update_fastapp(int argc, char *argv[])
+static void update_fastapp(int argc, char *argv[])
 {
 	printf("update fastapp\n");
 }
+BUILDIN_CMD("update-fastapp", update_fastapp);
 
-void remove_fastapp(int argc, char *argv[])
+static void remove_fastapp(int argc, char *argv[])
 {
 	printf("remove fastapp\n");
 }
+BUILDIN_CMD("remove-fastapp", remove_fastapp);
 
-void update_fw(int argc, char *argv[])
+static void update_fw(int argc, char *argv[])
 {
 	printf("update fw\n");
 }
+BUILDIN_CMD("update-fw", update_fw);
+
