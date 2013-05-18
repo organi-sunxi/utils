@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 #include <stdlib.h>
+#include <sys/wait.h>
 #include "command.h"
 #include "logmessage.h"
 
@@ -41,6 +43,42 @@ static void exit_cmd(int argc, char *argv[])
 	exit(0);
 }
 BUILDIN_CMD("exit", exit_cmd);
+
+int run_cmd_quiet(out_callback_fun fn, const char * format,...)
+{
+	FILE *fp;
+	int rc;
+	char cmd[1024];
+	va_list arg_ptr;
+	va_start(arg_ptr, format);
+	vsnprintf(cmd, sizeof(cmd), format, arg_ptr);
+	va_end(arg_ptr);
+	
+	fp = popen(cmd, "r");
+	if(fp == NULL){
+		printf("failed[run %s]\n", cmd);
+		return -1;
+	}
+
+	while(fgets(cmd, sizeof(cmd), fp) != NULL){
+		if(fn)
+			fn(cmd, sizeof(cmd));
+	}
+
+	rc = pclose(fp);
+	if(rc == -1){
+		printf("failed[close run]\n");
+		return -1;
+	}
+
+	if(WEXITSTATUS(rc)!=0){
+		printf("failed[exit code %d]\n", WEXITSTATUS(rc));
+		return -1;
+	}
+	
+	printf("sucess\n");
+	return 0;
+}
 
 
 #define STATE_WHITESPACE (0)

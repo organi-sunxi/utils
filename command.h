@@ -7,6 +7,9 @@ typedef struct
 	void (*fun)(int argc, char *argv[]);
 }command_t;
 
+typedef void (*out_callback_fun)(char out[], int n);
+int run_cmd_quiet(out_callback_fun fn, const char * format, ...);
+
 void deal_command(char *cmdline);
 
 #define BUILDIN_CMD(c,f)	static command_t f##_buildin_cmd \

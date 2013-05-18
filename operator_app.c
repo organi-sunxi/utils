@@ -27,7 +27,9 @@ BUILDIN_CMD("update-fastapp", update_fastapp);
 
 static void remove_fastapp(int argc, char *argv[])
 {
-	printf("remove fastapp\n");
+	char *pdev="/dev/mtd3";
+
+	run_cmd_quiet(NULL, "flash_eraseall %s", pdev);
 }
 BUILDIN_CMD("remove-fastapp", remove_fastapp);
 
