@@ -30,6 +30,8 @@ int main(int argc, char *argv[])
 	int next_option;
 	const char*const short_options ="hc:l:";
 
+	setvbuf(stdout, NULL, _IONBF, MAX_COMMAND);
+
 	do {
 		next_option =getopt(argc,argv,short_options); 
 		switch (next_option) 
@@ -58,6 +60,9 @@ int main(int argc, char *argv[])
 		fgets(cmdline, sizeof(cmdline), stdin);
 		deal_command(cmdline);
 	}
+
+	if(plogfile)
+		fclose(plogfile);
 
 	return 0;
 }

@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "command.h"
+#include "logmessage.h"
 
 #define MAX_ARGS 50
 
@@ -33,6 +34,10 @@ BUILDIN_CMD("reboot", reboot);
 static void exit_cmd(int argc, char *argv[])
 {
 	printf("exit\n");
+
+	if(plogfile)
+		fclose(plogfile);
+
 	exit(0);
 }
 BUILDIN_CMD("exit", exit_cmd);
@@ -44,26 +49,21 @@ static void parse_args(char *cmdline, int *argc, char **argv)
 {
 	char *ch = cmdline;
 	int state = STATE_WHITESPACE;
-	int i = 0;
 
-	*argc = 0;
+	argv[0]=ch;
 
-	while (*ch != '\0') {
-		if (state == 0) {
-			if (*ch != ' ') {
-				argv[i] = ch;
-				i++;
-				state = STATE_WORD;
-			}
-		}
-		else {
-			if ((*ch == ' ') || (*ch == '\n')) {
-				*ch = '\0';
-				state = STATE_WHITESPACE;
-			}
+	for (*argc = 0; *ch != '\0'; ch++) {
+		if ((*ch == ' ') || (*ch == '\n')|| (*ch == '\r')) {
+			*ch = '\0';
+			state = STATE_WHITESPACE;
+			continue;
 		}
 
-		ch++;
+		if (state == STATE_WHITESPACE){
+			argv[*argc] = ch;
+			(*argc)++;
+			state = STATE_WORD;
+		}
 	}
 }
 
@@ -78,9 +78,11 @@ void deal_command(char *cmdline)
 
 	memset(argv, 0, sizeof(argv));
 	parse_args(cmdline, &argc, argv);
-	
-	for (cmd = __start_buildin_cmd; cmd < __stop_buildin_cmd; cmd++)
-	{
+
+	if(argc<=0)
+		return;
+
+	for (cmd = __start_buildin_cmd; cmd < __stop_buildin_cmd; cmd++){
 		if (!strcmp(argv[0], cmd->command)) {
 			cmd->fun(argc, argv);
 			return;
