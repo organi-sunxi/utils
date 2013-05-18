@@ -56,7 +56,7 @@ int run_cmd_quiet(out_callback_fun fn, const char * format,...)
 	
 	fp = popen(cmd, "r");
 	if(fp == NULL){
-		printf("failed[run %s]\n", cmd);
+		FAILED_OUT("run %s", cmd);
 		return -1;
 	}
 
@@ -67,16 +67,15 @@ int run_cmd_quiet(out_callback_fun fn, const char * format,...)
 
 	rc = pclose(fp);
 	if(rc == -1){
-		printf("failed[close run]\n");
+		FAILED_OUT("close run");
 		return -1;
 	}
 
 	if(WEXITSTATUS(rc)!=0){
-		printf("failed[exit code %d]\n", WEXITSTATUS(rc));
+		FAILED_OUT("exit code %d", WEXITSTATUS(rc));
 		return -1;
 	}
 	
-	printf("sucess\n");
 	return 0;
 }
 

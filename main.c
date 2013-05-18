@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
 	int next_option;
 	const char*const short_options ="hc:l:";
 
-	setvbuf(stdout, NULL, _IONBF, MAX_COMMAND);
+	setvbuf(stdout, NULL, _IONBF, 0);
 
 	do {
 		next_option =getopt(argc,argv,short_options); 
