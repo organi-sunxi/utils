@@ -23,35 +23,44 @@ static void print_usage (const char*program_name, int exit_code)
 	exit (exit_code); 
 }
 
-static void flit_string(const char *src, char *value_name, char *value_path)
+static int flit_string(char *src, char *value_name, char *value_path)
 {
-	int count;
-	const char *tmp = NULL;
+	char *tmp = NULL;
 	
-	if (!src) {
-		value_name = NULL;
-		value_path = NULL;
-		return;
+	if ((!strlen(src)) || (src[0] == '#')) {
+		return -1;
 	}
 
-	count = 0;
-	tmp = src;
-	while ((*tmp != '=') && (*tmp!= '\0')) {
-		tmp++;
-		count++;
+	tmp = strchr(src, '=');
+	if (!tmp) {
+		return -2;
 	}
-	strncpy(value_name, src, count);
-	
-	src += ++count;
-	strncpy(value_path, src, strlen(src) - 1);
+
+	*tmp++ = '\0';
+	strcpy(value_name, src);
+	strcpy(value_path, tmp);
+	return 0;
 }
 
-static void put_env()
+static void strtrim(char *pstr)
+{
+	char *src = pstr;
+
+	while (*src != '\0') {
+		if ((*src == ' ') || (*src == '\n')) {
+			strcpy(src, src + 1);
+			continue;
+		}
+
+		src++;
+	}
+}
+
+static void set_env()
 {
 	char path[MAX_STRING];
 	char value_name[MAX_STRING];
 	char value_path[MAX_STRING];
-	int path_len;
 	FILE *config_file = fopen(DEFAULT_CONFIG_FILE, "r");
 
 	if (!config_file) {
@@ -59,7 +68,11 @@ static void put_env()
 	}
 	
 	while (fgets(path, sizeof(path), config_file)) {
-		flit_string(path, value_name, value_path);
+		strtrim(path);
+		if (flit_string(path, value_name, value_path) < 0) {
+			continue;
+		}
+
 		setenv(value_name, value_path, 1);
 	}
 	
@@ -100,8 +113,7 @@ int main(int argc, char *argv[])
 	}while (next_option !=-1); 
 
 	//to do: set configure file into envirment
-
-	put_env();
+	set_env();
 
 	for (;;) {
 		printf(">");
