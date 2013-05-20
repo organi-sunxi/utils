@@ -7,6 +7,20 @@ typedef struct
 	void (*fun)(int argc, char *argv[]);
 }command_t;
 
+#define CUSLIB                     "CUSLIB_PATH"
+#define TMPFILENAME         "TMPFILE_PATH"
+#define APPNAME                 "APP_NAME"
+#define ETHNAME                 "ETH_NAME"
+#define SYSCONF                  "SYS_CONF"
+#define HOSTNAMEFILE       "HOSTNAME_FILE"
+
+#define DEFAULT_CUSLIB_PATH            "/data/cuslib"
+#define DEFAULT_TMPFILE_PATH          "/tmp"
+#define DEFAULT_APP_NAME                 "/data/run/run"
+#define DEFAULT_ETH_NAME                 "eth0"
+#define DEFAULT_SYS_CONF                  "/data/config"
+#define DEFAULT_HOSTNAME_FILE       "/data/hostname"
+
 typedef void (*out_callback_fun)(char out[], int n);
 int run_cmd_quiet(out_callback_fun fn, const char * format, ...);
 

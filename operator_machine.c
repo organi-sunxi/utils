@@ -3,12 +3,16 @@
 #include <time.h>
 #include <unistd.h>
 #include <errno.h>
+#include <stdlib.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <net/if_arp.h>
 #include <linux/if.h>
 #include "command.h"
+
+#define MAX_STRING 256
+#define MAX_FILE_LEN 1024
 
 static void get_mac(int argc, char *argv[])
 {
@@ -128,71 +132,80 @@ BUILDIN_CMD("set-mac", set_mac);
 
 static void get_ip(int argc, char *argv[])
 {
-	/*
 	struct ifreq ifr_ip;
 	struct sockaddr_in *sin;
-//	char ipaddr[50];
-//	unsigned long ip;
+	char eth[MAX_STRING];
+	char *tmp = getenv(ETHNAME);
 	int res;
 
+	memset(eth, 0, sizeof(eth));
+	if (!tmp) {
+		strcpy(eth, tmp);
+	}
+	else{
+		strcpy(eth, DEFAULT_ETH_NAME);
+	}
+	
 	if ((res = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		printf("failed[%s]\n", strerror(errno));
+		FAILED_OUT(strerror(errno));
 		return;
 	}
 
-	strcpy(ifr_ip.ifr_name, "eth0");
+	strcpy(ifr_ip.ifr_name, eth);
 	if (ioctl(res, SIOCGIFADDR, &ifr_ip) < 0) {
 		close(res);
-		printf("failed[%s]\n", strerror(errno));
+		FAILED_OUT(strerror(errno));
 		return;
 	}
 
 	sin = (struct sockaddr_in *)&(ifr_ip.ifr_addr);
-//	strcpy(ipaddr, inet_ntoa(sin->sin_addr));
 
-	printf("ip:%s\n", inet_ntoa(sin->sin_addr));
+	printf("%s\n", inet_ntoa(sin->sin_addr));
 
 	close(res);
-	*/
 }
 BUILDIN_CMD("get-ip", get_ip);
 
 static void set_ip(int argc, char *argv[])
 {
-	/*
-	struct sockaddr_in sin;
-	struct ifreq ifr_ip;
-	int res;
+	char sysconf_path[MAX_STRING];
+	char sysconf_line[MAX_STRING];
+	char sysconf_content[MAX_FILE_LEN] = {'\0'};
+	char *tmp_path = getenv(SYSCONF);
+	FILE *res = NULL;
 
-
-	if ((res = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		printf("failed[%s]\n", strerror(errno));
+	if (argc < 2) {
+		FAILED_OUT("too few arguments to function 'set-ip'");
 		return;
 	}
 
-	memset(&sin, 0, sizeof(sin));
-	strcpy(ifr_ip.ifr_name, "eth0");
-
-	sin.sin_family = AF_INET;
-	sin.sin_addr.s_addr = inet_addr("192.168.1.200");
-	memcpy(&ifr_ip.ifr_addr, &sin, sizeof(struct sockaddr_in));
-
-	if (ioctl(res, SIOCSIFADDR, &ifr_ip) < 0) {
-		close(res);
-		printf("failed[%s]\n", strerror(errno));
-		return;
+	if (!tmp_path) {
+		strcpy(sysconf_path, tmp_path);
 	}
-							
-	ifr_ip.ifr_flags |= IFF_UP | IFF_RUNNING;
-	if (ioctl(res, SIOCSIFFLAGS, &ifr_ip) < 0) {
-		close(res);
-		printf("failed[%s]\n", strerror(errno));
+	else {
+		strcpy(sysconf_path, DEFAULT_SYS_CONF);
+	}
+
+	if (!(res = fopen(sysconf_path, "r+"))) {
+		FAILED_OUT(strerror(errno));
 		return;
 	}
 
-	close(res);
-	printf("sucess\n");
-	*/
+	while (fgets(sysconf_line, sizeof(sysconf_line), res)) {
+		if (strncmp(sysconf_line, "IPADDR", 6) == 0) {
+			memset(sysconf_line, 0, sizeof(sysconf_line));
+			strcpy(sysconf_line, "IPADDR=");
+			strcat(sysconf_line, argv[argc - 1]);
+			strcat(sysconf_line, "\n");
+		}
+
+		strcat(sysconf_content, sysconf_line);
+	}
+
+	fseek(res, 0, SEEK_SET);
+	fputs(sysconf_content, res);
+	fclose(res);
+	SUCESS_OUT();
 }
 BUILDIN_CMD("set-ip", set_ip);
 
@@ -240,77 +253,120 @@ BUILDIN_CMD("set-splash", set_splash);
 
 static void get_date(int argc, char *argv[])
 {
-	/*
 	time_t timep;
 	struct tm *p_tm = NULL;
-	char strtime[15];
+	char strtime[MAX_STRING];
 
 	timep = time(NULL);
 	p_tm = localtime(&timep);
 
 	strftime(strtime, sizeof(strtime), "%Y%m%d%H%M%S", p_tm);
 	printf("%s\n", strtime);
-	*/
 }
 BUILDIN_CMD("get-date", get_date);
 
 static void set_date(int argc, char *argv[])
 {
-	/*
 	time_t timep;
 	struct tm p_tm;
 	struct timeval tv;
+	char *src = argv[argc - 1];
+	char tmp[MAX_STRING];
+
+	if (argc < 2) {
+		FAILED_OUT("too few arguments to function 'set-date'");
+		return;
+	}
 
 	memset(&p_tm, 0, sizeof(struct tm));
+	strcpy(src, argv[argc - 1]);
 
-	p_tm.tm_sec = 0;
-	p_tm.tm_min = 15;
-	p_tm.tm_hour = 11;
-	p_tm.tm_mday = 26;
-	p_tm.tm_mon = 10 - 1;
-	p_tm.tm_year = 2013 - 1900;
+	memset(tmp, 0, sizeof(tmp));
+	strncpy(tmp, src, 4);
+	src += 4;
+	p_tm.tm_year = atoi(tmp) -1900;
+
+	memset(tmp, 0, sizeof(tmp));
+	strncpy(tmp, src, 2);
+	src += 2;
+	p_tm.tm_mon = atoi(tmp) - 1;
+
+	memset(tmp, 0, sizeof(tmp));
+	strncpy(tmp, src, 2);
+	src += 2;
+	p_tm.tm_mday = atoi(tmp);
+
+	memset(tmp, 0, sizeof(tmp));
+	strncpy(tmp, src, 2);
+	src += 2;
+	p_tm.tm_hour = atoi(tmp);
+
+	memset(tmp, 0, sizeof(tmp));
+	strncpy(tmp, src, 2);
+	src += 2;
+	p_tm.tm_min = atoi(tmp);
+
+	memset(tmp, 0, sizeof(tmp));
+	strncpy(tmp, src, 2);
+	p_tm.tm_sec = atoi(tmp);
 
 	if ((timep = mktime(&p_tm)) < 0) {
-		printf("failed[%s]\n", strerror(errno));
+		FAILED_OUT(strerror(errno));
 		return;
 	}
 
 	tv.tv_sec = timep;
 	tv.tv_usec = 0;
 	if (settimeofday(&tv, (struct timezone*)0) < 0) {
-		printf("failed[%s]\n", strerror(errno));
+		FAILED_OUT(strerror(errno));
 		return;
 	}
 
-	printf("success\n");
-	*/
+	system("hwclock -w");
+	SUCESS_OUT();
 }
 BUILDIN_CMD("set-date", set_date);
 
 static void get_host(int argc, char *argv[])
 {
-/*
-	char hostname[50];
+	char hostname[MAX_STRING];
 
 	if (gethostname(hostname, sizeof(hostname)) < 0) {
-		printf("failed[%s]\n", strerror(errno));
+		FAILED_OUT(strerror(errno));
 		return;
 	}
 
-	printf("%s\n", hostname);	
-*/
+	printf("%s\n", hostname);
 }
 BUILDIN_CMD("get-host", get_host);
 
 static void set_host(int argc, char *argv[])
 {
-/*
-	if (sethostname(parameter, strlen(parameter)) < 0) {
-		printf("failed[%s]\n", strerror(errno));
+	char host_path[MAX_STRING];
+	char *tmp_path = getenv(HOSTNAMEFILE);
+	FILE *res = NULL;
+	
+	if (argc < 2) {
+		FAILED_OUT("too few arguments to command 'set-host'");
 		return;
 	}
-*/
-	printf("success\n");
+
+	if (!tmp_path) {
+		strcpy(host_path, tmp_path);
+	}
+	else {
+		strcpy(host_path, DEFAULT_HOSTNAME_FILE);
+	}
+
+	if (!(res = fopen(host_path, "w+"))) {
+		FAILED_OUT(strerror(errno));
+		return;
+	}
+
+	fputs(argv[argc - 1], res);
+	fclose(res);
+
+	SUCESS_OUT();
 }
 BUILDIN_CMD("set-host", set_host);
 

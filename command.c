@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <sys/wait.h>
 #include "command.h"
 #include "logmessage.h"
@@ -23,13 +24,14 @@ BUILDIN_CMD("help", help);
 
 static void version(int argc, char *argv[])
 {
-	printf("version 1.0.12\n");
+	printf("version 1.0.0\n");
 }
 BUILDIN_CMD("version", version);
 
 static void reboot(int argc, char *argv[])
 {
-	printf("reboot\n");
+	SUCESS_OUT();
+	system("reboot");
 }
 BUILDIN_CMD("reboot", reboot);
 
