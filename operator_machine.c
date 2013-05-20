@@ -134,18 +134,9 @@ static void get_ip(int argc, char *argv[])
 {
 	struct ifreq ifr_ip;
 	struct sockaddr_in *sin;
-	char eth[MAX_STRING];
-	char *tmp = getenv(ETHNAME);
+	const char *eth = GET_CONF_VALUE(ETH_NAME);
 	int res;
 
-	memset(eth, 0, sizeof(eth));
-	if (!tmp) {
-		strcpy(eth, tmp);
-	}
-	else{
-		strcpy(eth, DEFAULT_ETH_NAME);
-	}
-	
 	if ((res = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		FAILED_OUT(strerror(errno));
 		return;
@@ -168,22 +159,14 @@ BUILDIN_CMD("get-ip", get_ip);
 
 static void set_ip(int argc, char *argv[])
 {
-	char sysconf_path[MAX_STRING];
+	const char *sysconf_path = GET_CONF_VALUE(SYS_CONF);
 	char sysconf_line[MAX_STRING];
 	char sysconf_content[MAX_FILE_LEN] = {'\0'};
-	char *tmp_path = getenv(SYSCONF);
 	FILE *res = NULL;
 
 	if (argc < 2) {
 		FAILED_OUT("too few arguments to function 'set-ip'");
 		return;
-	}
-
-	if (!tmp_path) {
-		strcpy(sysconf_path, tmp_path);
-	}
-	else {
-		strcpy(sysconf_path, DEFAULT_SYS_CONF);
 	}
 
 	if (!(res = fopen(sysconf_path, "r+"))) {
@@ -342,20 +325,12 @@ BUILDIN_CMD("get-host", get_host);
 
 static void set_host(int argc, char *argv[])
 {
-	char host_path[MAX_STRING];
-	char *tmp_path = getenv(HOSTNAMEFILE);
+	const char *host_path = GET_CONF_VALUE(HOSTNAME_FILE);
 	FILE *res = NULL;
 	
 	if (argc < 2) {
 		FAILED_OUT("too few arguments to command 'set-host'");
 		return;
-	}
-
-	if (!tmp_path) {
-		strcpy(host_path, tmp_path);
-	}
-	else {
-		strcpy(host_path, DEFAULT_HOSTNAME_FILE);
 	}
 
 	if (!(res = fopen(host_path, "w+"))) {

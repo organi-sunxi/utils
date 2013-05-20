@@ -46,6 +46,15 @@ static void exit_cmd(int argc, char *argv[])
 }
 BUILDIN_CMD("exit", exit_cmd);
 
+const char* get_env_default(const char* env, const char *def)
+{
+	const char *p = getenv(env);
+	if(p)
+		return p;
+
+	return def;
+}
+
 int run_cmd_quiet(out_callback_fun fn, const char * format,...)
 {
 	FILE *fp;

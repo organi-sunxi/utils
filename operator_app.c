@@ -54,11 +54,11 @@ static void update_fastapp_nandwrite(char out[], int n)
 static void update_fastapp(int argc, char *argv[])
 {
 	char *mkinitfs="mkinitfs", *tmppath="/tmp";
-	char *pdev="/dev/mtd3";
+	const char *pdev= GET_CONF_VALUE(FASTAPP_DEVICE);
 	int ret;
 	struct stat fst;
 
-	LOG("%s", __FUNCTION__);
+	LOG("%s\n", __FUNCTION__);
 	if(argc<2)
 		return;
 
@@ -87,8 +87,8 @@ BUILDIN_CMD("update-fastapp", update_fastapp);
 
 static void remove_fastapp(int argc, char *argv[])
 {
-	char *pdev="/dev/mtd3";
-	LOG("%s", __FUNCTION__);
+	const char *pdev= GET_CONF_VALUE(FASTAPP_DEVICE);
+	LOG("%s\n", __FUNCTION__);
 
 	if(run_cmd_quiet(NULL, "flash_eraseall %s", pdev)==0)
 		SUCESS_OUT();
