@@ -53,8 +53,9 @@ static void update_fastapp_nandwrite(char out[], int n)
 
 static void update_fastapp(int argc, char *argv[])
 {
-	char *mkinitfs="mkinitfs", *tmppath="/tmp";
-	const char *pdev= GET_CONF_VALUE(FASTAPP_DEVICE);
+	const char *mkinitfs=GET_CONF_VALUE(MKINITFS), 
+		*tmppath=GET_CONF_VALUE(TMPFILE_PATH),
+		*pdev= GET_CONF_VALUE(FASTAPP_DEVICE);
 	int ret;
 	struct stat fst;
 
