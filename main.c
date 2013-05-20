@@ -56,12 +56,12 @@ static void strtrim(char *pstr)
 	}
 }
 
-static void set_env()
+static void set_env(const char *filename)
 {
 	char path[MAX_STRING];
 	char value_name[MAX_STRING];
 	char value_path[MAX_STRING];
-	FILE *config_file = fopen(DEFAULT_CONFIG_FILE, "r");
+	FILE *config_file = fopen(filename, "r");
 
 	if (!config_file) {
 		return;
@@ -113,7 +113,7 @@ int main(int argc, char *argv[])
 	}while (next_option !=-1); 
 
 	//to do: set configure file into envirment
-	set_env();
+	set_env(conf_filename);
 
 	for (;;) {
 		printf(">");
