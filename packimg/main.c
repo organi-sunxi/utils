@@ -4,6 +4,7 @@
 #include <string.h>
 
 #define PACK_MAGIC 0x4b434150
+#define PACK_NAME_MAX 32
 
 struct pack_header {
 	uint32_t magic;
@@ -16,11 +17,12 @@ struct pack_entry {
 	uint32_t size;
 	uint32_t ldaddr;
 	uint32_t crc;
+	char name[PACK_NAME_MAX];
 };
 
 void print_usage(char *cmd)
 {
-	printf("Usage: %s pagesize file@loadaddr [file@loadaddr] ... [file@loadaddr] output", cmd);
+	printf("Usage: %s pagesize file@loadaddr [file@loadaddr] ... [file@loadaddr] output\n", cmd);
 }
 
 int main(int argc, char **argv)
@@ -103,6 +105,8 @@ int main(int argc, char **argv)
 		pe[i].crc = 0;
 		for (j = 0; j < pe[i].size; j += 4)
 			pe[i].crc += *(uint32_t *)(buffer[i] + j);
+
+		strncpy(pe[i].name, filename, PACK_NAME_MAX);
 
 		fclose(fin);
 	}
