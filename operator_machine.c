@@ -145,7 +145,7 @@ static void set_ip(int argc, char *argv[])
 	LOG("%s\n", __FUNCTION__);
 	
 	if (argc < 2) {
-		FAILED_OUT("too few arguments to function 'set-ip'");
+		FAILED_OUT("too few arguments to command 'set-ip'");
 		return;
 	}
 
@@ -338,7 +338,7 @@ static void set_rotation(int argc, char *argv[])
 	LOG("%s\n", __FUNCTION__);
 	
 	if (argc < 2) {
-		FAILED_OUT("too few arguments to function 'set-ip'");
+		FAILED_OUT("too few arguments to command 'set-ip'");
 		return;
 	}
 
@@ -413,7 +413,7 @@ static void set_date(int argc, char *argv[])
 	LOG("%s\n", __FUNCTION__);
 	
 	if (argc < 2) {
-		FAILED_OUT("too few arguments to function 'set-date'");
+		FAILED_OUT("too few arguments to command 'set-date'");
 		return;
 	}
 
