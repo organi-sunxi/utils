@@ -252,7 +252,21 @@ BUILDIN_CMD("get-lcd", get_lcd);
 
 static void set_lcd(int argc, char *argv[])
 {
-	printf("set lcd\n");
+	char buf[MAX_STRING];
+	char *lcd_argv[MAX_ARGS];
+	int lcd_argc;
+	int index = -1;
+/*	
+	LOG("%s\n", __FUNCTION__);
+
+	if (argc < 2) {
+		FAILED_OUT("too few arguments to function 'set-date'");
+		return;
+	}*/
+
+	system("fw_setenv lcdtimings sharp_lq057 640x480@23500,48:32:80,15:15:15,BODPhv\
+			\nAUO_G070VW01V0 800x480@29500,10:192:10,10:20:10,BODPhv\
+			\njoe 800x480@29500,10:192:10,10:20:10,BODPhv\n");
 }
 BUILDIN_CMD("set-lcd", set_lcd);
 
@@ -288,7 +302,35 @@ BUILDIN_CMD("list-lcd", list_lcd);
 
 static void get_rotation(int argc, char *argv[])
 {
-	printf("get rotation\n");
+	const char *sysconf_path = GET_CONF_VALUE(SYS_CONF);
+	char sysconf_line[MAX_STRING];
+	char *sysconf_content = NULL;
+	long sysconf_size;
+	FILE *res = NULL;
+
+	LOG("%s\n", __FUNCTION__);
+
+	if (!(res = fopen(sysconf_path, "r"))) {
+		FAILED_OUT(strerror(errno));
+		return;
+	}
+
+	fseek(res, 0, SEEK_END);
+	sysconf_size = ftell(res);
+	sysconf_content = (char *)malloc(sysconf_size + 1);
+	memset(sysconf_content, 0, sysconf_size + 1);	
+	fseek(res, 0, SEEK_SET);
+
+	while (fgets(sysconf_line, sizeof(sysconf_line), res)) {
+		if (strncmp(sysconf_line, "ROTATE=Transformed:Rot", 22) == 0) {
+			strcpy(sysconf_line, &sysconf_line[22]);
+			printf("%d\n", atoi(sysconf_line));
+			break;
+		}
+	}
+	
+	fclose(res);
+	free(sysconf_content);
 }
 BUILDIN_CMD("get-rotation", get_rotation);
 
