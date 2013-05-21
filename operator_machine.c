@@ -183,12 +183,15 @@ BUILDIN_CMD("set-ip", set_ip);
 
 #define STATE_WHITESPACE (0)
 #define STATE_WORD (1)
-static void parse_args(char *cmdline, int *argc, char **argv)
+static void parse_all_lcds(char *lcdbuf, int *argc, char **argv)
 {
-	char *ch = cmdline;
+	char *ch = lcdbuf;
 	int state = STATE_WHITESPACE;
 
 	argv[0]=ch;
+	if (strncmp(lcdbuf, "lcdtimings=", 11) == 0) {
+		strcpy(lcdbuf, lcdbuf + 11);	
+	}
 
 	for (*argc = 0; *ch != '\0'; ch++) {
 		if (*ch == '\n') {
@@ -205,6 +208,20 @@ static void parse_args(char *cmdline, int *argc, char **argv)
 	}
 }
 
+static int get_lcd_index()
+{
+	char buf[MAX_STRING];
+	FILE *res = popen("fw_printenv lcdindex", "r");
+
+	memset(buf, 0, sizeof(buf));
+	fread(buf, sizeof(char), sizeof(buf), res);
+	if (strncmp(buf, "lcdindex=", 9) == 0) {
+		return atoi(&buf[9]);
+	}
+
+	return -1;
+}
+
 static void get_lcd(int argc, char *argv[])
 {
 	char buf[MAX_STRING];
@@ -215,23 +232,14 @@ static void get_lcd(int argc, char *argv[])
 	
 	LOG("%s\n", __FUNCTION__);
 
-	res = popen("fw_printenv lcdindex", "r");
-	memset(buf, 0, sizeof(buf));
-	fread(buf, sizeof(char), sizeof(buf), res);
-	if (strncmp(buf, "lcdindex=", 9) == 0) {
-		index = atoi(&buf[9]);
-	}
+	index = get_lcd_index();
 
 	res = popen("fw_printenv lcdtimings", "r");
 	memset(buf, 0, sizeof(buf));
 	fread(buf, sizeof(char), sizeof(buf), res);
-
-	if (strncmp(buf, "lcdtimings=", 11) == 0) {
-		strcpy(buf, &buf[11]);	
-	}
 	
 	memset(lcd_argv, 0, sizeof(lcd_argv));
-	parse_args(buf, &lcd_argc, lcd_argv);
+	parse_all_lcds(buf, &lcd_argc, lcd_argv);
 	
 	if ((index >= 0) && (index < lcd_argc)) {
 		printf("%s\n", lcd_argv[index]);
@@ -250,7 +258,31 @@ BUILDIN_CMD("set-lcd", set_lcd);
 
 static void list_lcd(int argc, char *argv[])
 {
-	printf("list lcd\n");
+	char buf[MAX_STRING];
+	char *lcd_argv[MAX_ARGS];
+	int lcd_argc;
+	int index = -1;
+	FILE *res;
+	
+	LOG("%s\n", __FUNCTION__);
+
+	index = get_lcd_index();
+
+	res = popen("fw_printenv lcdtimings", "r");
+	memset(buf, 0, sizeof(buf));
+	fread(buf, sizeof(char), sizeof(buf), res);
+
+	memset(lcd_argv, 0, sizeof(lcd_argv));
+	parse_all_lcds(buf, &lcd_argc, lcd_argv);
+
+	while (lcd_argc--) {
+		if (lcd_argc != index) {
+			printf(" %s\n", lcd_argv[lcd_argc]);
+		}
+		else {
+			printf("*%s\n", lcd_argv[lcd_argc]);
+		}
+	}
 }
 BUILDIN_CMD("list-lcd", list_lcd);
 
