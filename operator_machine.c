@@ -12,62 +12,35 @@
 #include "command.h"
 
 #define MAX_STRING 256
-#define MAX_FILE_LEN 1024
 
 static void get_mac(int argc, char *argv[])
 {
-	printf("get_mac\n");
-#if 0
 	struct ifreq ifr_mac;
 	struct ifreq *tmp = NULL;
-//	struct ifconf ifc;
-	int res, i;
-//	char buf[1024];
+	const char *eth = GET_CONF_VALUE(ETH_NAME);
 	unsigned char mac[6];
+	int res;
 
+	LOG("%s\n", __FUNCTION__);
+	
 	if ((res = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-		printf("failed[%s]\n", strerror(errno));
+		FAILED_OUT(strerror(errno));
 		return;
 	}
 
-
-	strcpy(ifr_mac.ifr_name, "eth0");
+	strcpy(ifr_mac.ifr_name, eth);
 	
 	if (ioctl(res, SIOCGIFHWADDR, &ifr_mac) < 0) {
 		close(res);
-		printf("failed[%s]\n", strerror(errno));
+		FAILED_OUT(strerror(errno));
 		return;
 	}
 
 	bcopy(&ifr_mac.ifr_hwaddr.sa_data, mac, sizeof(mac));
-	printf("%s: %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x\n", 
-			ifr_mac.ifr_name,
+	printf("%2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x\n", 
 			mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
-	/*
-	ifc.ifc_len = sizeof(buf);
-	ifc.ifc_buf = buf;
-	ioctl(res, SIOCGIFCONF, &ifc);
-	tmp = ifc.ifc_req;
-
-	for (i = ifc.ifc_len / sizeof(struct ifreq); --i >= 0; tmp++) {
-		if (!strncmp(tmp->ifr_name, "eth", 3)) {
-			strcpy(ifr.ifr_name, tmp->ifr_name);
-
-			if (!ioctl(res, SIOCGIFHWADDR, &ifr)) {
-				memset(mac, 0, sizeof(mac));
-				bcopy(ifr.ifr_hwaddr.sa_data, mac, 6);
-
-				printf("%s: %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x\n", 
-						ifr.ifr_name,
-						mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-			}
-		}
-	}
-	*/
-
 	close(res);
-#endif
 }
 BUILDIN_CMD("get-mac", get_mac);
 
@@ -137,6 +110,8 @@ static void get_ip(int argc, char *argv[])
 	const char *eth = GET_CONF_VALUE(ETH_NAME);
 	int res;
 
+	LOG("%s\n", __FUNCTION__);
+	
 	if ((res = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		FAILED_OUT(strerror(errno));
 		return;
@@ -161,9 +136,12 @@ static void set_ip(int argc, char *argv[])
 {
 	const char *sysconf_path = GET_CONF_VALUE(SYS_CONF);
 	char sysconf_line[MAX_STRING];
-	char sysconf_content[MAX_FILE_LEN] = {'\0'};
+	char *sysconf_content = NULL;
+	long sysconf_size;
 	FILE *res = NULL;
 
+	LOG("%s\n", __FUNCTION__);
+	
 	if (argc < 2) {
 		FAILED_OUT("too few arguments to function 'set-ip'");
 		return;
@@ -173,6 +151,12 @@ static void set_ip(int argc, char *argv[])
 		FAILED_OUT(strerror(errno));
 		return;
 	}
+
+	fseek(res, 0, SEEK_END);
+	sysconf_size = ftell(res);
+	sysconf_content = (char *)malloc(sysconf_size + MAX_STRING + 1);
+	memset(sysconf_content, 0, sysconf_size + MAX_STRING + 1);	
+	fseek(res, 0, SEEK_SET);
 
 	while (fgets(sysconf_line, sizeof(sysconf_line), res)) {
 		if (strncmp(sysconf_line, "IPADDR", 6) == 0) {
@@ -184,10 +168,13 @@ static void set_ip(int argc, char *argv[])
 
 		strcat(sysconf_content, sysconf_line);
 	}
-
-	fseek(res, 0, SEEK_SET);
+	fclose(res);
+	
+	res = fopen(sysconf_path, "w");
 	fputs(sysconf_content, res);
 	fclose(res);
+	
+	free(sysconf_content);
 	SUCESS_OUT();
 }
 BUILDIN_CMD("set-ip", set_ip);
@@ -240,6 +227,8 @@ static void get_date(int argc, char *argv[])
 	struct tm *p_tm = NULL;
 	char strtime[MAX_STRING];
 
+	LOG("%s\n", __FUNCTION__);
+	
 	timep = time(NULL);
 	p_tm = localtime(&timep);
 
@@ -256,6 +245,8 @@ static void set_date(int argc, char *argv[])
 	char *src = argv[argc - 1];
 	char tmp[MAX_STRING];
 
+	LOG("%s\n", __FUNCTION__);
+	
 	if (argc < 2) {
 		FAILED_OUT("too few arguments to function 'set-date'");
 		return;
@@ -314,6 +305,8 @@ static void get_host(int argc, char *argv[])
 {
 	char hostname[MAX_STRING];
 
+	LOG("%s\n", __FUNCTION__);
+	
 	if (gethostname(hostname, sizeof(hostname)) < 0) {
 		FAILED_OUT(strerror(errno));
 		return;
@@ -327,13 +320,15 @@ static void set_host(int argc, char *argv[])
 {
 	const char *host_path = GET_CONF_VALUE(HOSTNAME_FILE);
 	FILE *res = NULL;
+
+	LOG("%s\n", __FUNCTION__);
 	
 	if (argc < 2) {
 		FAILED_OUT("too few arguments to command 'set-host'");
 		return;
 	}
 
-	if (!(res = fopen(host_path, "w+"))) {
+	if (!(res = fopen(host_path, "w"))) {
 		FAILED_OUT(strerror(errno));
 		return;
 	}
