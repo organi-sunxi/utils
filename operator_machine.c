@@ -13,6 +13,7 @@
 #include "logmessage.h"
 
 #define MAX_STRING 256
+#define MAX_ARGS 50
 
 static void get_mac(int argc, char *argv[])
 {
@@ -180,9 +181,64 @@ static void set_ip(int argc, char *argv[])
 }
 BUILDIN_CMD("set-ip", set_ip);
 
+#define STATE_WHITESPACE (0)
+#define STATE_WORD (1)
+static void parse_args(char *cmdline, int *argc, char **argv)
+{
+	char *ch = cmdline;
+	int state = STATE_WHITESPACE;
+
+	argv[0]=ch;
+
+	for (*argc = 0; *ch != '\0'; ch++) {
+		if (*ch == '\n') {
+			*ch = '\0';
+			state = STATE_WHITESPACE;
+			continue;
+		}
+
+		if (state == STATE_WHITESPACE){
+			argv[*argc] = ch;
+			(*argc)++;
+			state = STATE_WORD;
+		}
+	}
+}
+
 static void get_lcd(int argc, char *argv[])
 {
-	printf("get lcd\n");
+	char buf[MAX_STRING];
+	char *lcd_argv[MAX_ARGS];
+	int lcd_argc;
+	int index = -1;
+	FILE *res;
+	
+	LOG("%s\n", __FUNCTION__);
+
+	res = popen("fw_printenv lcdindex", "r");
+	memset(buf, 0, sizeof(buf));
+	fread(buf, sizeof(char), sizeof(buf), res);
+	if (strncmp(buf, "lcdindex=", 9) == 0) {
+		index = atoi(&buf[9]);
+	}
+
+	res = popen("fw_printenv lcdtimings", "r");
+	memset(buf, 0, sizeof(buf));
+	fread(buf, sizeof(char), sizeof(buf), res);
+
+	if (strncmp(buf, "lcdtimings=", 11) == 0) {
+		strcpy(buf, &buf[11]);	
+	}
+	
+	memset(lcd_argv, 0, sizeof(lcd_argv));
+	parse_args(buf, &lcd_argc, lcd_argv);
+	
+	if ((index >= 0) && (index < lcd_argc)) {
+		printf("%s\n", lcd_argv[index]);
+		return;
+	}
+
+	FAILED_OUT("indexlcd is error");
 }
 BUILDIN_CMD("get-lcd", get_lcd);
 
