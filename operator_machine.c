@@ -304,7 +304,6 @@ static void get_rotation(int argc, char *argv[])
 {
 	const char *sysconf_path = GET_CONF_VALUE(SYS_CONF);
 	char sysconf_line[MAX_STRING];
-	char *sysconf_content = NULL;
 	long sysconf_size;
 	FILE *res = NULL;
 
@@ -315,22 +314,17 @@ static void get_rotation(int argc, char *argv[])
 		return;
 	}
 
-	fseek(res, 0, SEEK_END);
-	sysconf_size = ftell(res);
-	sysconf_content = (char *)malloc(sysconf_size + 1);
-	memset(sysconf_content, 0, sysconf_size + 1);	
-	fseek(res, 0, SEEK_SET);
-
 	while (fgets(sysconf_line, sizeof(sysconf_line), res)) {
 		if (strncmp(sysconf_line, "ROTATE=Transformed:Rot", 22) == 0) {
 			strcpy(sysconf_line, &sysconf_line[22]);
 			printf("%d\n", atoi(sysconf_line));
 			break;
 		}
+
+		memset(sysconf_line, 0, sizeof(sysconf_line));
 	}
 	
 	fclose(res);
-	free(sysconf_content);
 }
 BUILDIN_CMD("get-rotation", get_rotation);
 
