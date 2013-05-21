@@ -304,7 +304,6 @@ static void get_rotation(int argc, char *argv[])
 {
 	const char *sysconf_path = GET_CONF_VALUE(SYS_CONF);
 	char sysconf_line[MAX_STRING];
-	long sysconf_size;
 	FILE *res = NULL;
 
 	LOG("%s\n", __FUNCTION__);
@@ -330,7 +329,48 @@ BUILDIN_CMD("get-rotation", get_rotation);
 
 static void set_rotation(int argc, char *argv[])
 {
-	printf("set rotation\n");
+	const char *sysconf_path = GET_CONF_VALUE(SYS_CONF);
+	char sysconf_line[MAX_STRING];
+	char *sysconf_content = NULL;
+	long sysconf_size;
+	FILE *res = NULL;
+
+	LOG("%s\n", __FUNCTION__);
+	
+	if (argc < 2) {
+		FAILED_OUT("too few arguments to function 'set-ip'");
+		return;
+	}
+
+	if (!(res = fopen(sysconf_path, "r+"))) {
+		FAILED_OUT(strerror(errno));
+		return;
+	}
+
+	fseek(res, 0, SEEK_END);
+	sysconf_size = ftell(res);
+	sysconf_content = (char *)malloc(sysconf_size + MAX_STRING + 1);
+	memset(sysconf_content, 0, sysconf_size + MAX_STRING + 1);	
+	fseek(res, 0, SEEK_SET);
+
+	while (fgets(sysconf_line, sizeof(sysconf_line), res)) {
+		if (strncmp(sysconf_line, "ROTATE=Transformed:Rot", 22) == 0) {
+			memset(sysconf_line, 0, sizeof(sysconf_line));
+			strcpy(sysconf_line, "ROTATE=Transformed:Rot");
+			strcat(sysconf_line, argv[argc - 1]);
+			strcat(sysconf_line, ":\n");
+		}
+
+		strcat(sysconf_content, sysconf_line);
+	}
+	fclose(res);
+	
+	res = fopen(sysconf_path, "w");
+	fputs(sysconf_content, res);
+	fclose(res);
+	
+	free(sysconf_content);
+	SUCESS_OUT();	
 }
 BUILDIN_CMD("set-rotation", set_rotation);
 
