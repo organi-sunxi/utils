@@ -10,6 +10,7 @@
 #include <net/if_arp.h>
 #include <linux/if.h>
 #include "command.h"
+#include "logmessage.h"
 
 #define MAX_STRING 256
 
