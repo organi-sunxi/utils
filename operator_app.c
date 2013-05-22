@@ -1,12 +1,31 @@
 #include <stdio.h>
+#include <string.h>
 #include <sys/stat.h>
 
 #include "command.h"
 #include "logmessage.h"
 
+#define MAX_STRING 125
+
 static void run(int argc, char *argv[])
 {
-	printf("run\n");
+	char command[MAX_STRING] = {'\0'};
+	
+	LOG("%s\n", __FUNCTION__);
+
+	if (argc < 2) {
+		FAILED_OUT("too few arguments to command 'run'");
+		return;
+	}
+
+	if (argc == 3) {
+		strcpy(command, "cd ");
+		strcat(command, argv[2]);
+		strcat(command, "\n");
+	}
+
+	if(run_cmd_quiet(NULL, "%s%s", command, argv[1]) == 0)
+		SUCESS_OUT();
 }
 BUILDIN_CMD("run", run);
 	
