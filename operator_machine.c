@@ -12,7 +12,7 @@
 #include "command.h"
 #include "logmessage.h"
 
-#define MAX_STRING 256
+#define MAX_STRING 1024
 #define MAX_ARGS 50
 
 static void get_mac(int argc, char *argv[])
@@ -243,9 +243,11 @@ static void get_lcd(int argc, char *argv[])
 	
 	if ((index >= 0) && (index < lcd_argc)) {
 		printf("%s\n", lcd_argv[index]);
+		pclose(res);
 		return;
 	}
 
+	pclose(res);
 	FAILED_OUT("indexlcd is error");
 }
 BUILDIN_CMD("get-lcd", get_lcd);
@@ -253,22 +255,68 @@ BUILDIN_CMD("get-lcd", get_lcd);
 static void set_lcd(int argc, char *argv[])
 {
 	char buf[MAX_STRING];
-	char *lcd_argv[MAX_ARGS];
+	char *lcd_argv[MAX_ARGS];	
+	char *set_buf;
+	FILE *res;
+	int buf_size;
 	int lcd_argc;
-	int index = -1;
-/*	
+	int i;
+	
 	LOG("%s\n", __FUNCTION__);
 
-	if (argc < 2) {
+	if (argc < 3) {
 		FAILED_OUT("too few arguments to function 'set-date'");
 		return;
-	}*/
+	}
 
-	system("fw_setenv lcdtimings sharp_lq057 640x480@23500,48:32:80,15:15:15,BODPhv\
-			\nAUO_G070VW01V0 800x480@29500,10:192:10,10:20:10,BODPhv\
-			\njoe 800x480@29500,10:192:10,10:20:10,BODPhv\n");
+	res = popen("fw_printenv lcdtimings", "r");
+	memset(buf, 0, sizeof(buf));
+	fread(buf, sizeof(char), sizeof(buf), res);
+	
+	parse_all_lcds(buf, &lcd_argc, lcd_argv);
+
+	buf_size = sizeof(buf) + strlen(argv[argc - 1]) + 1;
+	set_buf = (char *)malloc(buf_size);
+	if (!set_buf) {
+		printf("aaa\n");
+		return;
+	}
+	memset(set_buf, 0, buf_size);
+	strcpy(set_buf, "fw_setenv lcdtimings \"");
+	
+	i = 0;
+	while (i < lcd_argc) {
+		if (strncmp(lcd_argv[i], argv[argc - 2], 
+						strlen(argv[argc - 2 ])) == 0) {
+			break;
+		}
+
+		strcat(set_buf, lcd_argv[i++]);
+		strcat(set_buf, "\n");
+	}
+	
+	strcat(set_buf, argv[argc - 2]);
+	strcat(set_buf, " ");
+	strcat(set_buf, argv[argc - 1]);
+	strcat(set_buf, "\n");
+
+	if (!strcmp(argv[1], "-c")) {
+		run_cmd_quiet(NULL, "%s\"%d\"", "fw_setenv lcdindex ", i);
+	}
+
+	i++;
+	while (i < lcd_argc) {
+		strcat(set_buf, lcd_argv[i++]);
+		strcat(set_buf, "\n");
+	}
+	strcat(set_buf, "\"");
+	
+	pclose(res);
+	free(set_buf);
+	SUCESS_OUT();
 }
 BUILDIN_CMD("set-lcd", set_lcd);
+
 
 static void list_lcd(int argc, char *argv[])
 {
@@ -370,7 +418,7 @@ static void set_rotation(int argc, char *argv[])
 	fclose(res);
 	
 	free(sysconf_content);
-	SUCESS_OUT();	
+	SUCESS_OUT();
 }
 BUILDIN_CMD("set-rotation", set_rotation);
 
