@@ -48,7 +48,11 @@ BUILDIN_CMD("update-app", update_app);
 
 static void run_startup_app(int argc, char *argv[])
 {
-	printf("run startup app\n");
+	LOG("%s\n", __FUNCTION__);
+
+	if (run_cmd_quiet(NULL, "%s", 
+						GET_CONF_VALUE(APP_NAME)) == 0) 
+		SUCESS_OUT();
 }
 BUILDIN_CMD("run-startup-app", run_startup_app);
 
