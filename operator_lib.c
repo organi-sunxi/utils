@@ -43,13 +43,10 @@ BUILDIN_CMD("md5sum", md5sum);
 
 void update_lib(int argc, char *argv[])
 {
-	char src_file[MAX_STRING] = {'\0'};
 	char dest_file[MAX_STRING] = {'\0'};
-	char command[MAX_STRING] = {'\0'};
 	char cd_command[MAX_STRING] = {'\0'};
-	const char *src_path = GET_CONF_VALUE(TMPFILE_PATH);
 	const char *dest_path = GET_CONF_VALUE(CUSLIB_PATH);
-	int flag = -1;
+	int flag = 0;
 	
 	LOG("%s\n", __FUNCTION__);
 
@@ -61,39 +58,24 @@ void update_lib(int argc, char *argv[])
 	strcpy(cd_command, "cd ");
 	strcat(cd_command, dest_path);
 	strcat(cd_command, "\n");
-	
-	strcpy(src_file, src_path);
-	strcat(src_file, "/");
-	strcat(src_file, argv[argc - 1]);
-	if (access(src_file, 0) < 0) {
-		FAILED_OUT(strerror(errno));
+
+	if (run_cmd_quiet(NULL, "%scp %s/%s .", 
+					cd_command, 
+					GET_CONF_VALUE(TMPFILE_PATH), 
+					argv[argc - 1]) < 0) 
 		return;
-	}
 
-	memset(command, 0, sizeof(command));
-	strcpy(command, cd_command);
-	strcat(command, "cp ");
-	strcat(command, src_file);
-	strcat(command, " .");
-	system(command);
-
-	memset(command, 0, sizeof(command));
-	strcpy(command, cd_command);
-	strcat(command, "ln -s ");
-	strcat(command, argv[argc - 1]);
-	strcat(command, " ");
-	strcat(command, argv[argc - 1]);
-	
 	memset(dest_file, 0, sizeof(dest_file));
 	strcpy(dest_file, dest_path);
 	strcat(dest_file, "/");
 	strcat(dest_file, argv[argc - 1]);
+	
 	flag = 3;
 	while (flag--) {
-		command[strlen(command) - 2] = '\0';
 		dest_file[strlen(dest_file) - 2] = '\0';
 		if (access(dest_file, 0) < 0) {
-			system(command);
+			run_cmd_quiet(NULL, "%sln -s %s %s", 
+				cd_command, argv[argc - 1], dest_file);
 		}
 	}	
 
