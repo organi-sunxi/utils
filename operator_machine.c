@@ -15,6 +15,9 @@
 #define MAX_STRING 1024
 #define MAX_ARGS 50
 
+static char s_lcdtimings_buf[MAX_STRING];
+static char s_lcdindex_buf[MAX_STRING];
+
 static void get_mac(int argc, char *argv[])
 {
 	struct ifreq ifr_mac;
@@ -208,56 +211,60 @@ static void parse_all_lcds(char *lcdbuf, int *argc, char **argv)
 	}
 }
 
+static void lcd_index_content(char out[], int n)
+{
+	strncat(s_lcdindex_buf, out, n);
+}
+
 static int get_lcd_index()
 {
-	char buf[MAX_STRING];
-	FILE *res = popen("fw_printenv lcdindex", "r");
+	memset(s_lcdindex_buf, 0, sizeof(s_lcdindex_buf));
+	if (run_cmd_quiet(lcd_index_content, "%s", "fw_printenv lcdindex") < 0) {
+		return -1;
+	}
 
-	memset(buf, 0, sizeof(buf));
-	fread(buf, sizeof(char), sizeof(buf), res);
-	if (strncmp(buf, "lcdindex=", 9) == 0) {
-		return atoi(&buf[9]);
+	if (strncmp(s_lcdindex_buf, "lcdindex=", 9) == 0) {
+		return atoi(&s_lcdindex_buf[9]);
 	}
 
 	return -1;
 }
 
+static void get_all_lcds(char out[], int n)
+{
+	strncat(s_lcdtimings_buf, out, n);
+}
+
 static void get_lcd(int argc, char *argv[])
 {
-	char buf[MAX_STRING];
 	char *lcd_argv[MAX_ARGS];
 	int lcd_argc;
 	int index = -1;
-	FILE *res;
 	
 	LOG("%s\n", __FUNCTION__);
 
 	index = get_lcd_index();
 
-	res = popen("fw_printenv lcdtimings", "r");
-	memset(buf, 0, sizeof(buf));
-	fread(buf, sizeof(char), sizeof(buf), res);
-	
+	memset(s_lcdtimings_buf, 0, sizeof(s_lcdtimings_buf));
+	if (run_cmd_quiet(get_all_lcds, "%s", "fw_printenv lcdtimings") < 0)
+		return;
+
 	memset(lcd_argv, 0, sizeof(lcd_argv));
-	parse_all_lcds(buf, &lcd_argc, lcd_argv);
+	parse_all_lcds(s_lcdtimings_buf, &lcd_argc, lcd_argv); 
 	
 	if ((index >= 0) && (index < lcd_argc)) {
 		printf("%s\n", lcd_argv[index]);
-		pclose(res);
 		return;
 	}
 
-	pclose(res);
 	FAILED_OUT("indexlcd is error");
 }
 BUILDIN_CMD("get-lcd", get_lcd);
 
 static void set_lcd(int argc, char *argv[])
-{
-	char buf[MAX_STRING];
+{ 
 	char *lcd_argv[MAX_ARGS];	
-	char *set_buf;
-	FILE *res;
+	char *set_buf; 
 	int buf_size;
 	int lcd_argc;
 	int i;
@@ -269,18 +276,14 @@ static void set_lcd(int argc, char *argv[])
 		return;
 	}
 
-	res = popen("fw_printenv lcdtimings", "r");
-	memset(buf, 0, sizeof(buf));
-	fread(buf, sizeof(char), sizeof(buf), res);
+	memset(s_lcdtimings_buf, 0, sizeof(s_lcdtimings_buf));
+	if (run_cmd_quiet(get_all_lcds, "%s", "fw_printenv lcdtimings") < 0)
+		return; 
 	
-	parse_all_lcds(buf, &lcd_argc, lcd_argv);
+	parse_all_lcds(s_lcdtimings_buf, &lcd_argc, lcd_argv);
 
-	buf_size = sizeof(buf) + strlen(argv[argc - 1]) + 1;
-	set_buf = (char *)malloc(buf_size);
-	if (!set_buf) {
-		printf("aaa\n");
-		return;
-	}
+	buf_size = sizeof(s_lcdtimings_buf) + strlen(argv[argc - 1]) + 1;
+	set_buf = (char *)malloc(buf_size); 
 	memset(set_buf, 0, buf_size);
 	strcpy(set_buf, "fw_setenv lcdtimings \"");
 	
@@ -310,8 +313,7 @@ static void set_lcd(int argc, char *argv[])
 		strcat(set_buf, "\n");
 	}
 	strcat(set_buf, "\"");
-	
-	pclose(res);
+	 
 	free(set_buf);
 	SUCESS_OUT();
 }
@@ -320,22 +322,20 @@ BUILDIN_CMD("set-lcd", set_lcd);
 
 static void list_lcd(int argc, char *argv[])
 {
-	char buf[MAX_STRING];
 	char *lcd_argv[MAX_ARGS];
 	int lcd_argc;
 	int index = -1;
-	FILE *res;
 	
 	LOG("%s\n", __FUNCTION__);
 
 	index = get_lcd_index();
 
-	res = popen("fw_printenv lcdtimings", "r");
-	memset(buf, 0, sizeof(buf));
-	fread(buf, sizeof(char), sizeof(buf), res);
+	memset(s_lcdtimings_buf, 0, sizeof(s_lcdtimings_buf));
+	if (run_cmd_quiet(get_all_lcds, "%s", "fw_printenv lcdtimings") < 0)
+		return; 
 
 	memset(lcd_argv, 0, sizeof(lcd_argv));
-	parse_all_lcds(buf, &lcd_argc, lcd_argv);
+	parse_all_lcds(s_lcdtimings_buf, &lcd_argc, lcd_argv);
 
 	while (lcd_argc--) {
 		if (lcd_argc != index) {
