@@ -30,8 +30,19 @@ static void run(int argc, char *argv[])
 BUILDIN_CMD("run", run);
 	
 static void update_app(int argc, char *argv[])
-{
-	printf("update app\n");
+{	
+	LOG("%s\n", __FUNCTION__);
+
+	if (argc < 2) {
+		FAILED_OUT("too few arguments to command 'update-app'");
+		return;
+	}
+
+	if(run_cmd_quiet(NULL, "cp %s/%s %s", 
+					GET_CONF_VALUE(TMPFILE_PATH),
+					argv[1],
+					GET_CONF_VALUE(APP_NAME)) == 0)
+		SUCESS_OUT();
 }
 BUILDIN_CMD("update-app", update_app);
 
