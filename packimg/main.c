@@ -65,7 +65,7 @@ int main(int argc, char **argv)
 	for (i = 0; i < nentry; i++) {
 		FILE *fin;
 		int j;
-		char *filename, *loadaddr;
+		char *filename, *loadaddr, *name;
 		char *at = strchr(argv[i + 2], '@');
 		if (at == NULL) {
 			fprintf(stderr, "invalid input %s\n", argv[i + 2]);
@@ -106,7 +106,12 @@ int main(int argc, char **argv)
 		for (j = 0; j < pe[i].size; j += 4)
 			pe[i].crc += *(uint32_t *)(buffer[i] + j);
 
-		strncpy(pe[i].name, filename, PACK_NAME_MAX);
+		name = strrchr(filename, '/');
+		if (name == NULL)
+			name = filename;
+		else
+			name++;
+		strncpy(pe[i].name, name, PACK_NAME_MAX);
 
 		fclose(fin);
 	}
