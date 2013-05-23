@@ -9,24 +9,16 @@ nandwrite -p /dev/mtd1 u-boot.bin
 flash_eraseall /dev/mtd2
 nandwrite -p /dev/mtd2 em6000.env
 
-flash_eraseall /dev/mtd3
-nandwrite -p /dev/mtd3 em6000.dtb
-#nandwrite -p /dev/mtd3 em6000.atags
+packimg_burn -d /dev/mtd3 -c 5 -f pack.img
 
 flash_eraseall /dev/mtd4
-nandwrite -p /dev/mtd4 usplash.bin
+nandwrite -p /dev/mtd4 uImage
 
 flash_eraseall /dev/mtd5
-nandwrite -p /dev/mtd5 uscript.bin
+nandwrite -p /dev/mtd5 initfs.img
 
-flash_eraseall /dev/mtd6
-nandwrite -p /dev/mtd6 uImage
-
-flash_eraseall /dev/mtd7
-nandwrite -p /dev/mtd7 initfs.img
-
-ubiformat /dev/mtd8
-ubiattach /dev/ubi_ctrl -m 8
+ubiformat /dev/mtd6
+ubiattach /dev/ubi_ctrl -m 6
 ubimkvol /dev/ubi0 -N rootfs -s 128MiB
 ubiupdatevol /dev/ubi0_0 rootfs.img
 
