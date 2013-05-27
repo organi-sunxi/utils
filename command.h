@@ -11,14 +11,17 @@ typedef struct
 	void (*fun)(int argc, char *argv[]);
 }command_t;
 
+#define MAX_STRING 1024
 
 typedef void (*out_callback_fun)(char out[], int n);
 const char* get_env_default(const char* env, const char *def);
 int run_cmd_quiet(out_callback_fun fn, const char * format, ...);
 
-#define FAILED_OUT(...)	printf("failed[%s]\n", ##__VA_ARGS__)
+#define FAILED_OUT_HELPER(fmt, ...) printf("failed["fmt"]\n", __VA_ARGS__)
+#define FAILED_OUT(...)	FAILED_OUT_HELPER(__VA_ARGS__, 0)
 #define SUCESS_OUT()	printf("sucess\n")
-#define PROGRESS_OUT(p, ...)	printf("progress %d%%[%s]\n", p, ##__VA_ARGS__)
+#define PROGRESS_OUT_HELPER(p, fmt, ...)	printf("progress %d%%["fmt"]\n", p, __VA_ARGS__)
+#define PROGRESS_OUT(p,...)	PROGRESS_OUT_HELPER(p, __VA_ARGS__, 0)
 
 void deal_command(char *cmdline);
 

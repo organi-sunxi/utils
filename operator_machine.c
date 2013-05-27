@@ -12,7 +12,6 @@
 #include "command.h"
 #include "logmessage.h"
 
-#define MAX_STRING 1024
 #define MAX_ARGS 50
 
 static char s_lcdtimings_buf[MAX_STRING];
@@ -29,7 +28,7 @@ static void get_mac(int argc, char *argv[])
 	LOG("%s\n", __FUNCTION__);
 	
 	if ((res = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-		FAILED_OUT(strerror(errno));
+		FAILED_OUT("%s", strerror(errno));
 		return;
 	}
 
@@ -37,7 +36,7 @@ static void get_mac(int argc, char *argv[])
 	
 	if (ioctl(res, SIOCGIFHWADDR, &ifr_mac) < 0) {
 		close(res);
-		FAILED_OUT(strerror(errno));
+		FAILED_OUT("%s", strerror(errno));
 		return;
 	}
 
@@ -118,14 +117,14 @@ static void get_ip(int argc, char *argv[])
 	LOG("%s\n", __FUNCTION__);
 	
 	if ((res = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		FAILED_OUT(strerror(errno));
+		FAILED_OUT("%s", strerror(errno));
 		return;
 	}
 
 	strcpy(ifr_ip.ifr_name, eth);
 	if (ioctl(res, SIOCGIFADDR, &ifr_ip) < 0) {
 		close(res);
-		FAILED_OUT(strerror(errno));
+		FAILED_OUT("%s", strerror(errno));
 		return;
 	}
 
@@ -153,7 +152,7 @@ static void set_ip(int argc, char *argv[])
 	}
 
 	if (!(res = fopen(sysconf_path, "r+"))) {
-		FAILED_OUT(strerror(errno));
+		FAILED_OUT("%s", strerror(errno));
 		return;
 	}
 
@@ -357,7 +356,7 @@ static void get_rotation(int argc, char *argv[])
 	LOG("%s\n", __FUNCTION__);
 
 	if (!(res = fopen(sysconf_path, "r"))) {
-		FAILED_OUT(strerror(errno));
+		FAILED_OUT("%s", strerror(errno));
 		return;
 	}
 
@@ -391,7 +390,7 @@ static void set_rotation(int argc, char *argv[])
 	}
 
 	if (!(res = fopen(sysconf_path, "r+"))) {
-		FAILED_OUT(strerror(errno));
+		FAILED_OUT("%s", strerror(errno));
 		return;
 	}
 
@@ -498,14 +497,14 @@ static void set_date(int argc, char *argv[])
 	p_tm.tm_sec = atoi(tmp);
 
 	if ((timep = mktime(&p_tm)) < 0) {
-		FAILED_OUT(strerror(errno));
+		FAILED_OUT("%s", strerror(errno));
 		return;
 	}
 
 	tv.tv_sec = timep;
 	tv.tv_usec = 0;
 	if (settimeofday(&tv, (struct timezone*)0) < 0) {
-		FAILED_OUT(strerror(errno));
+		FAILED_OUT("%s", strerror(errno));
 		return;
 	}
 
@@ -521,7 +520,7 @@ static void get_host(int argc, char *argv[])
 	LOG("%s\n", __FUNCTION__);
 	
 	if (gethostname(hostname, sizeof(hostname)) < 0) {
-		FAILED_OUT(strerror(errno));
+		FAILED_OUT("%s", strerror(errno));
 		return;
 	}
 
@@ -542,7 +541,7 @@ static void set_host(int argc, char *argv[])
 	}
 
 	if (!(res = fopen(host_path, "w"))) {
-		FAILED_OUT(strerror(errno));
+		FAILED_OUT("%s", strerror(errno));
 		return;
 	}
 

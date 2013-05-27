@@ -1,10 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 #include "command.h"
 #include "logmessage.h"
-
-#define MAX_STRING 125
 
 static void md5sum_print(char out[], int n)
 {
@@ -28,25 +27,84 @@ static void md5sum(int argc, char *argv[])
 		return;
 	}
 
-	strcpy(file_path, GET_CONF_VALUE(CUSLIB_PATH));
-	strcat(file_path, "/");
-	strcat(file_path, argv[argc - 1]);
+	snprintf(file_path, sizeof(file_path), "%s/%s", GET_CONF_VALUE(CUSLIB_PATH), argv[2]);
 
 	if (access(file_path, 0) < 0) {
-		FAILED_OUT(strerror(errno));
+		FAILED_OUT("%s", strerror(errno));
 		return;
 	}
 
-	run_cmd_quiet(md5sum_print, "%s %s", "md5sum", file_path);
+	run_cmd_quiet(md5sum_print, "md5sum %s", file_path);
 }
 BUILDIN_CMD("md5sum", md5sum);
 
-void update_lib(int argc, char *argv[])
+static const char* get_filename(const char* fullpathname)
 {
-	char dest_file[MAX_STRING] = {'\0'};
-	char cd_command[MAX_STRING] = {'\0'};
+	const char *p, *pos;
+
+	for(pos = p = fullpathname; *p!=0; p++){
+		if(*p == '/')
+			pos = p+1;
+	}
+
+	return pos;
+} 
+
+static int update_lib_byname(const char *fullpathname, const char *dest_path)
+{
+	const char *fullname;
+	char name[MAX_STRING], *lp, *postfix=NULL;
+
+	int ret, len;
+
+	if(!dest_path)
+		return -1;
+
+	//must be a file
+	ret = access(fullpathname, F_OK|R_OK);
+	if( ret < 0){
+		FAILED_OUT("can't access %s", name);
+		return ret;
+	}
+
+	//name must be /path/filename.so or /path/filename.so.x...
+	fullname = get_filename(fullpathname);
+	strncpy(name, fullname, sizeof(name));
+
+	for(lp = strstr(name, ".so"); lp!=NULL; lp = strstr(lp, ".so")){
+		lp +=3;
+		postfix = lp;
+	}
+
+	if(!postfix){	//no .so in filename
+		FAILED_OUT("lib file name %s must include .so", name);
+		return -1;
+	}
+
+	chdir(dest_path);
+	ret = run_cmd_quiet(NULL, "cp %s .", fullpathname);
+	if ( ret < 0)
+		return ret;
+	len = strlen(postfix);
+	if(len==0)
+		return 0;
+	
+	for(lp=postfix+len; postfix<=lp; lp--){
+		if(*lp=='.'){
+			*lp=0;
+			unlink(name);
+			ret = run_cmd_quiet(NULL, "ln -s %s %s", fullname, name);
+			if(ret < 0)
+				return ret;
+		}
+	}
+
+	return 0;
+}
+
+static void update_lib(int argc, char *argv[])
+{
 	const char *dest_path = GET_CONF_VALUE(CUSLIB_PATH);
-	int flag = 0;
 	
 	LOG("%s\n", __FUNCTION__);
 
@@ -55,29 +113,9 @@ void update_lib(int argc, char *argv[])
 		return;
 	}
 
-	strcpy(cd_command, "cd ");
-	strcat(cd_command, dest_path);
-	strcat(cd_command, "\n");
-
-	if (run_cmd_quiet(NULL, "%scp %s/%s .", 
-					cd_command, 
-					GET_CONF_VALUE(TMPFILE_PATH), 
-					argv[argc - 1]) < 0) 
-		return;
-
-	memset(dest_file, 0, sizeof(dest_file));
-	strcpy(dest_file, dest_path);
-	strcat(dest_file, "/");
-	strcat(dest_file, argv[argc - 1]);
-	
-	flag = 3;
-	while (flag--) {
-		dest_file[strlen(dest_file) - 2] = '\0';
-		if (access(dest_file, 0) < 0) {
-			run_cmd_quiet(NULL, "%sln -s %s %s", 
-				cd_command, argv[argc - 1], dest_file);
-		}
-	}	
+	for(argv++; argc>=2; argv++, argc--){
+		update_lib_byname(*argv, dest_path);
+	}
 
 	SUCESS_OUT();
 }

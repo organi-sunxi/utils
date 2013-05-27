@@ -5,8 +5,6 @@
 #include "command.h"
 #include "logmessage.h"
 
-#define MAX_STRING 125
-
 static void run(int argc, char *argv[])
 {
 	char command[MAX_STRING] = {'\0'};

@@ -7,7 +7,6 @@
 #include "logmessage.h"
 
 #define MAX_COMMAND 256
-#define MAX_STRING 256
 #define DEFAULT_CONFIG_FILE	"/data/etc/emconfig.conf"
 
 
