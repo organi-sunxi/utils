@@ -1,14 +1,47 @@
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/stat.h>
+#include <signal.h>
+#include <errno.h>
 
 #include "command.h"
 #include "logmessage.h"
 
+static int stop_qtapp()
+{
+	char cmd[MAX_STRING];
+	snprintf(cmd, sizeof(cmd), "killall %s", GET_CONF_VALUE(APP_NAME));
+	return system(cmd);
+}
+
+static int run_qtapp(const char *fullpathname, const char *cd)
+{
+	pid_t pid;
+	int ret;
+
+	pid = fork();
+	if(pid == 0){//child
+		stop_qtapp();
+		if(cd && *cd)
+			chdir(cd);
+
+		signal(SIGINT,SIG_DFL);
+		execl(fullpathname, fullpathname, "-qws","$QWS_RUN_ARGS", NULL);
+	}
+	else if(pid<0){
+		FAILED_OUT("%s", strerror(errno));
+		return pid;
+	}
+	else
+		wait(NULL);
+
+	SUCESS_OUT();
+	return 0;
+}
+
 static void run(int argc, char *argv[])
 {
-	char command[MAX_STRING] = {'\0'};
-	
 	LOG("%s\n", __FUNCTION__);
 
 	if (argc < 2) {
@@ -16,17 +49,10 @@ static void run(int argc, char *argv[])
 		return;
 	}
 
-	if (argc == 3) {
-		strcpy(command, "cd ");
-		strcat(command, argv[2]);
-		strcat(command, "\n");
-	}
-
-	if(run_cmd_quiet(NULL, "%s%s", command, argv[1]) == 0)
-		SUCESS_OUT();
+	run_qtapp(argv[1], argc >= 3? argv[2] : NULL);
 }
 BUILDIN_CMD("run", run);
-	
+
 static void update_app(int argc, char *argv[])
 {	
 	LOG("%s\n", __FUNCTION__);
@@ -36,10 +62,10 @@ static void update_app(int argc, char *argv[])
 		return;
 	}
 
-	if(run_cmd_quiet(NULL, "cp %s/%s %s", 
-					GET_CONF_VALUE(TMPFILE_PATH),
-					argv[1],
-					GET_CONF_VALUE(APP_NAME)) == 0)
+	stop_qtapp();
+
+	if(run_cmd_quiet(NULL, "cp %s %s/%s",
+				argv[1],GET_CONF_VALUE(APP_PATH),GET_CONF_VALUE(APP_NAME)) == 0)
 		SUCESS_OUT();
 }
 BUILDIN_CMD("update-app", update_app);
@@ -48,9 +74,7 @@ static void run_startup_app(int argc, char *argv[])
 {
 	LOG("%s\n", __FUNCTION__);
 
-	if (run_cmd_quiet(NULL, "%s", 
-						GET_CONF_VALUE(APP_NAME)) == 0) 
-		SUCESS_OUT();
+	run_qtapp(GET_CONF_VALUE(APP_NAME), GET_CONF_VALUE(APP_PATH));
 }
 BUILDIN_CMD("run-startup-app", run_startup_app);
 

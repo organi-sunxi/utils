@@ -90,6 +90,18 @@ int run_cmd_quiet(out_callback_fun fn, const char * format,...)
 	return 0;
 }
 
+const char* get_filename(const char* fullpathname)
+{
+	const char *p, *pos;
+
+	for(pos = p = fullpathname; *p!=0; p++){
+		if(*p == '/')
+			pos = p+1;
+	}
+
+	return pos;
+} 
+
 
 #define STATE_WHITESPACE (0)
 #define STATE_WORD (1)

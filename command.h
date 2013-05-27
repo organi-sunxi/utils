@@ -13,6 +13,7 @@ typedef struct
 
 #define MAX_STRING 1024
 
+const char* get_filename(const char* fullpathname);
 typedef void (*out_callback_fun)(char out[], int n);
 const char* get_env_default(const char* env, const char *def);
 int run_cmd_quiet(out_callback_fun fn, const char * format, ...);

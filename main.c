@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#include <signal.h>
 
 #include "command.h"
 #include "logmessage.h"
@@ -110,6 +111,8 @@ int main(int argc, char *argv[])
 			print_usage (argv[0],1); 
 		}
 	}while (next_option !=-1); 
+
+	signal(SIGINT,SIG_IGN);
 
 	//to do: set configure file into envirment
 	set_env(conf_filename);

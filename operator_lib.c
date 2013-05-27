@@ -38,18 +38,6 @@ static void md5sum(int argc, char *argv[])
 }
 BUILDIN_CMD("md5sum", md5sum);
 
-static const char* get_filename(const char* fullpathname)
-{
-	const char *p, *pos;
-
-	for(pos = p = fullpathname; *p!=0; p++){
-		if(*p == '/')
-			pos = p+1;
-	}
-
-	return pos;
-} 
-
 static int update_lib_byname(const char *fullpathname, const char *dest_path)
 {
 	const char *fullname;
