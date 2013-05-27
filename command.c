@@ -55,6 +55,49 @@ const char* get_env_default(const char* env, const char *def)
 	return def;
 }
 
+int set_conf_file(const char *conf_file, const char *key, const char *value)
+{
+	char sysconf_line[MAX_STRING];
+	char *sysconf_content = NULL, *p, *tail;
+	long sysconf_size, len=strlen(key);
+	FILE *res = NULL;
+
+	LOG("%s\n", __FUNCTION__);
+
+	res = fopen(conf_file, "r+");
+	if (!res) {
+		FAILED_OUT("%s", strerror(errno));
+		return -1;
+	}
+
+	fseek(res, 0, SEEK_END);
+	sysconf_size = ftell(res);
+	sysconf_content = (char *)malloc(sysconf_size + MAX_STRING + 1);
+	if(!sysconf_content){
+		FAILED_OUT("%s", strerror(errno));
+		return -1;
+	}
+
+	fseek(res, 0, SEEK_SET);
+	tail = sysconf_content;
+	while (fgets(sysconf_line, sizeof(sysconf_line), res)){
+		p = sysconf_line+strspn(sysconf_line, " \t");	//remove space or tab
+		if (strncmp(p, key, len)==0 && strchr("= \t", p[len])!=NULL) {
+			snprintf(sysconf_line, sizeof(sysconf_line), "IPADDR=%s\n", value);
+		}
+
+		tail+=sprintf(tail, "%s", sysconf_line);
+	}
+	
+	fseek(res, 0, SEEK_SET);
+	fputs(sysconf_content, res);
+	fclose(res);
+	
+	free(sysconf_content);
+
+	return 0;
+}
+
 int run_cmd_quiet(out_callback_fun fn, const char * format,...)
 {
 	FILE *fp;

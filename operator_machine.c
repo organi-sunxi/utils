@@ -17,6 +17,14 @@
 static char s_lcdtimings_buf[MAX_STRING];
 static char s_lcdindex_buf[MAX_STRING];
 
+static void platform(int argc, char *argv[])
+{
+	LOG("%s\n", __FUNCTION__);
+	
+	printf("%s\n", GET_CONF_VALUE(PLATFORM));
+}
+BUILDIN_CMD("platform", platform);
+
 static void get_mac(int argc, char *argv[])
 {
 	struct ifreq ifr_mac;
@@ -50,6 +58,7 @@ BUILDIN_CMD("get-mac", get_mac);
 
 static void set_mac(int argc, char *argv[])
 {
+	FAILED_OUT("not support");
 #if 0
 	struct ifreq ifr_mac;
 //	struct ifreq *tmp = NULL;
@@ -138,12 +147,6 @@ BUILDIN_CMD("get-ip", get_ip);
 
 static void set_ip(int argc, char *argv[])
 {
-	const char *sysconf_path = GET_CONF_VALUE(SYS_CONF);
-	char sysconf_line[MAX_STRING];
-	char *sysconf_content = NULL;
-	long sysconf_size;
-	FILE *res = NULL;
-
 	LOG("%s\n", __FUNCTION__);
 	
 	if (argc < 2) {
@@ -151,35 +154,8 @@ static void set_ip(int argc, char *argv[])
 		return;
 	}
 
-	if (!(res = fopen(sysconf_path, "r+"))) {
-		FAILED_OUT("%s", strerror(errno));
-		return;
-	}
-
-	fseek(res, 0, SEEK_END);
-	sysconf_size = ftell(res);
-	sysconf_content = (char *)malloc(sysconf_size + MAX_STRING + 1);
-	memset(sysconf_content, 0, sysconf_size + MAX_STRING + 1);	
-	fseek(res, 0, SEEK_SET);
-
-	while (fgets(sysconf_line, sizeof(sysconf_line), res)) {
-		if (strncmp(sysconf_line, "IPADDR", 6) == 0) {
-			memset(sysconf_line, 0, sizeof(sysconf_line));
-			strcpy(sysconf_line, "IPADDR=");
-			strcat(sysconf_line, argv[argc - 1]);
-			strcat(sysconf_line, "\n");
-		}
-
-		strcat(sysconf_content, sysconf_line);
-	}
-	fclose(res);
-	
-	res = fopen(sysconf_path, "w");
-	fputs(sysconf_content, res);
-	fclose(res);
-	
-	free(sysconf_content);
-	SUCESS_OUT();
+	if(set_conf_file(GET_CONF_VALUE(SYS_CONF), "IPADDR", argv[1])==0)
+		SUCESS_OUT();
 }
 BUILDIN_CMD("set-ip", set_ip);
 
