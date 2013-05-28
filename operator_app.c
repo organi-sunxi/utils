@@ -10,14 +10,8 @@
 #include "command.h"
 #include "logmessage.h"
 
-static int stop_qtapp()
-{
-	char cmd[MAX_STRING];
-	snprintf(cmd, sizeof(cmd), "killall %s", GET_CONF_VALUE(APP_NAME));
-	return system(cmd);
-}
-
 static pid_t qt_run_pid=-1;
+
 static int stop_running_app(void)
 {
 	if(qt_run_pid > 0){
@@ -25,6 +19,13 @@ static int stop_running_app(void)
 		waitpid(qt_run_pid, NULL, WNOHANG);
 		qt_run_pid = -1;
 	}
+}
+
+static int stop_qtapp()
+{
+	char cmd[MAX_STRING];
+	snprintf(cmd, sizeof(cmd), "killall %s 2>/dev/null", GET_CONF_VALUE(APP_NAME));
+	return system(cmd);
 }
 
 static int run_qtapp(const char *fullpathname, const char *cd)
@@ -40,7 +41,6 @@ static int run_qtapp(const char *fullpathname, const char *cd)
 		if(cd && *cd)
 			chdir(cd);
 
-		signal(SIGINT,SIG_DFL);
 		execl(fullpathname, fullpathname, "-qws","$QWS_RUN_ARGS", NULL);
 		exit(0);
 	}
@@ -64,6 +64,9 @@ static void run(int argc, char *argv[])
 		return;
 	}
 
+	if(run_cmd_quiet(NULL, NULL, "chmod +x %s",	argv[1])<0)
+		return;
+	
 	run_qtapp(argv[1], argc >= 3? argv[2] : NULL);
 }
 BUILDIN_CMD("run", run);
@@ -87,8 +90,8 @@ static void update_app(int argc, char *argv[])
 
 	stop_qtapp();
 
-	if(run_cmd_quiet(NULL, NULL, "cp %s %s/%s",
-				argv[1],GET_CONF_VALUE(APP_PATH),GET_CONF_VALUE(APP_NAME)) == 0)
+	if(run_cmd_quiet(NULL, NULL, "chmod +x %s && cp %s %s/%s",
+				argv[1], argv[1],GET_CONF_VALUE(APP_PATH),GET_CONF_VALUE(APP_NAME)) == 0)
 		SUCESS_OUT();
 }
 BUILDIN_CMD("update-app", update_app);

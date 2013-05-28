@@ -112,8 +112,6 @@ int main(int argc, char *argv[])
 		}
 	}while (next_option !=-1); 
 
-	signal(SIGINT,SIG_IGN);
-
 	//to do: set configure file into envirment
 	set_env(conf_filename);
 
