@@ -376,33 +376,6 @@ failed1:
 }
 BUILDIN_CMD("set-lcd", set_lcd);
 
-static void rm_lcd(int argc, char *argv[])
-{
-	struct lcdinfo lcdinfo[MAX_ARGS];
-	int nlcd, i;
-	int index = -1;
-	char *lcdname;
-	
-	LOG("%s\n", __FUNCTION__);
-
-	index = get_lcd_index();
-	parse_all_lcds(&nlcd, lcdinfo);
-
-	if (argc < 2) {
-		FAILED_OUT("too few arguments");
-		return;
-	}
-
-	lcdname = argv[1];
-
-	for (i=0; i <nlcd; i++) {
-		if(strcmp(lcdinfo[i].lcdname, lcdname)==0)
-			
-		printf("%c%s %s\n", i==index ? '*':' ', lcdinfo[i].lcdname, lcdinfo[i].lcdparam);
-	}
-}
-BUILDIN_CMD("rm-lcd", rm_lcd);
-
 static void list_lcd(int argc, char *argv[])
 {
 	struct lcdinfo lcdinfo[MAX_ARGS];
