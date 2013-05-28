@@ -288,7 +288,7 @@ static void set_lcd(int argc, char *argv[])
 	
 	LOG("%s\n", __FUNCTION__);
 
-	optind=1;
+	optind=0;
 	while((next_option =getopt(argc,argv,short_options))!=-1) {
 		switch (next_option){
 		case 'c':
@@ -500,7 +500,7 @@ static void set_bklight(int argc, char *argv[])
 		return;
 	}
 
-	optind=1;
+	optind=0;
 	while((next_option =getopt(argc,argv,short_options))!=-1) {
 		switch (next_option){
 		case 's':

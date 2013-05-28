@@ -85,13 +85,13 @@ static void update_app(int argc, char *argv[])
 	LOG("%s\n", __FUNCTION__);
 
 	if (argc < 2) {
-		FAILED_OUT("too few arguments to command 'update-app'");
+		FAILED_OUT("too few arguments");
 		return;
 	}
 
 	stop_qtapp();
 
-	if(run_cmd_quiet(NULL, NULL, "chmod +x %s && cp %s %s/%s",
+	if(run_cmd_quiet(NULL, NULL, "chmod +x %s && cp %s %s/%s 2>/dev/null",
 				argv[1], argv[1],GET_CONF_VALUE(APP_PATH),GET_CONF_VALUE(APP_NAME)) == 0)
 		SUCESS_OUT();
 }
@@ -142,8 +142,10 @@ static void update_fastapp(int argc, char *argv[])
 	struct stat fst;
 
 	LOG("%s\n", __FUNCTION__);
-	if(argc<2)
+	if (argc < 2) {
+		FAILED_OUT("too few arguments");
 		return;
+	}
 
 	chdir(tmppath);
 	if(run_cmd_quiet(update_fastapp_mkinitfs, NULL, "%s %s "INITFS_IMG_NAME, mkinitfs, argv[1])<0)
