@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
@@ -12,7 +13,7 @@
 
 static pid_t qt_run_pid=-1;
 
-static int stop_running_app(void)
+int stop_running_app(void)
 {
 	if(qt_run_pid > 0){
 		kill(qt_run_pid, SIGINT);

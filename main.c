@@ -80,6 +80,7 @@ static void set_env(const char *filename)
 }
 
 
+extern int stop_running_app(void);
 
 int main(int argc, char *argv[])
 {
@@ -114,7 +115,8 @@ int main(int argc, char *argv[])
 
 	//to do: set configure file into envirment
 	set_env(conf_filename);
-
+	atexit(stop_running_app);
+	
 	for (;;) {
 		printf(">");
 		fgets(cmdline, sizeof(cmdline), stdin);
