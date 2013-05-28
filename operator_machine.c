@@ -396,74 +396,56 @@ BUILDIN_CMD("list-lcd", list_lcd);
 
 static void get_rotation(int argc, char *argv[])
 {
-	const char *sysconf_path = GET_CONF_VALUE(SYS_CONF);
-	char sysconf_line[MAX_STRING];
+	char value[MAX_STRING];
 	FILE *res = NULL;
+	int ret;
 
 	LOG("%s\n", __FUNCTION__);
+	ret = get_conf_file(GET_CONF_VALUE(SYS_CONF), "ROTATE", value);
 
-	if (!(res = fopen(sysconf_path, "r"))) {
-		FAILED_OUT("%s", strerror(errno));
+	if(ret<=0){
+		printf("0\n");
 		return;
 	}
 
-	while (fgets(sysconf_line, sizeof(sysconf_line), res)) {
-		if (strncmp(sysconf_line, "ROTATE=Transformed:Rot", 22) == 0) {
-			strcpy(sysconf_line, &sysconf_line[22]);
-			printf("%d\n", atoi(sysconf_line));
-			break;
-		}
-
-		memset(sysconf_line, 0, sizeof(sysconf_line));
+	if(strncmp(value, "Transformed:Rot:", 16)==0){
+		printf("%s\n", value+16);
+		return;
 	}
-	
-	fclose(res);
+
+	FAILED_OUT("error format");
 }
 BUILDIN_CMD("get-rotation", get_rotation);
 
 static void set_rotation(int argc, char *argv[])
 {
-	const char *sysconf_path = GET_CONF_VALUE(SYS_CONF);
-	char sysconf_line[MAX_STRING];
-	char *sysconf_content = NULL;
-	long sysconf_size;
+	char value[MAX_STRING];
+	int v;
 	FILE *res = NULL;
 
 	LOG("%s\n", __FUNCTION__);
 	
 	if (argc < 2) {
-		FAILED_OUT("too few arguments to command 'set-ip'");
+		FAILED_OUT("too few arguments");
 		return;
 	}
 
-	if (!(res = fopen(sysconf_path, "r+"))) {
-		FAILED_OUT("%s", strerror(errno));
+	v = strtol(argv[1], NULL, 0);
+	switch(v){
+	case 0:
+		value[0] = 0;
+		break;
+	case 90:
+	case 180:
+	case 270:
+		snprintf(value, sizeof(value), "Transformed:Rot:%d", v);
+		break;
+	default:
+		FAILED_OUT("error angel");
 		return;
 	}
 
-	fseek(res, 0, SEEK_END);
-	sysconf_size = ftell(res);
-	sysconf_content = (char *)malloc(sysconf_size + MAX_STRING + 1);
-	memset(sysconf_content, 0, sysconf_size + MAX_STRING + 1);	
-	fseek(res, 0, SEEK_SET);
-
-	while (fgets(sysconf_line, sizeof(sysconf_line), res)) {
-		if (strncmp(sysconf_line, "ROTATE=Transformed:Rot", 22) == 0) {
-			memset(sysconf_line, 0, sizeof(sysconf_line));
-			strcpy(sysconf_line, "ROTATE=Transformed:Rot");
-			strcat(sysconf_line, argv[argc - 1]);
-			strcat(sysconf_line, ":\n");
-		}
-
-		strcat(sysconf_content, sysconf_line);
-	}
-	fclose(res);
-	
-	res = fopen(sysconf_path, "w");
-	fputs(sysconf_content, res);
-	fclose(res);
-	
-	free(sysconf_content);
+	set_conf_file(GET_CONF_VALUE(SYS_CONF), "ROTATE", value);
 	SUCESS_OUT();
 }
 BUILDIN_CMD("set-rotation", set_rotation);

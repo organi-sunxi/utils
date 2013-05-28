@@ -55,6 +55,41 @@ const char* get_env_default(const char* env, const char *def)
 	return def;
 }
 
+int get_conf_file(const char *conf_file, const char *key, char *value)
+{
+	char sysconf_line[MAX_STRING], *p;
+	int len=strlen(key), ret=0;
+	FILE *res = NULL;
+
+	*value = 0;
+	res = fopen(conf_file, "r");
+	if (!res) {
+		FAILED_OUT("%s", strerror(errno));
+		return -1;
+	}
+
+	while (fgets(sysconf_line, sizeof(sysconf_line), res)) {
+		p = sysconf_line+strspn(sysconf_line, " \t");	//remove space or tab
+		if (strncmp(p, key, len)==0 && strchr("= \t", p[len])!=NULL) {
+			p += len;
+			p += strspn(p, " \t");	//remove space or tab
+			if(*p!='='){	//can't find value
+				ret = 0;
+				break;
+			}
+			p++;
+			p += strspn(p, " \t");	//remove space or tab
+			for(ret=0; *p!='\n' && *p!=0; ret++)
+				*value++ = *p++;
+			*value = 0;
+			break;
+		}
+	}
+
+	fclose(res);
+	return ret;
+}
+
 int set_conf_file(const char *conf_file, const char *key, const char *value)
 {
 	char sysconf_line[MAX_STRING];
@@ -64,7 +99,7 @@ int set_conf_file(const char *conf_file, const char *key, const char *value)
 
 	LOG("%s\n", __FUNCTION__);
 
-	res = fopen(conf_file, "r+");
+	res = fopen(conf_file, "r");
 	if (!res) {
 		FAILED_OUT("%s", strerror(errno));
 		return -1;
@@ -82,17 +117,22 @@ int set_conf_file(const char *conf_file, const char *key, const char *value)
 	tail = sysconf_content;
 	while (fgets(sysconf_line, sizeof(sysconf_line), res)){
 		p = sysconf_line+strspn(sysconf_line, " \t");	//remove space or tab
-		if (strncmp(p, key, len)==0 && strchr("= \t", p[len])!=NULL) {
-			snprintf(sysconf_line, sizeof(sysconf_line), "IPADDR=%s\n", value);
+		if (strncmp(p, key, len)==0 && strchr("= \t", p[len])!=NULL){
+			snprintf(sysconf_line, sizeof(sysconf_line), "%s=%s\n", key, value);
 		}
 
 		tail+=sprintf(tail, "%s", sysconf_line);
 	}
-	
-	fseek(res, 0, SEEK_SET);
+	fclose(res);
+
+	res = fopen(conf_file, "w");
+	if (!res) {
+		FAILED_OUT("%s", strerror(errno));
+		return -1;
+	}
 	fputs(sysconf_content, res);
 	fclose(res);
-	
+
 	free(sysconf_content);
 
 	return 0;
