@@ -5,7 +5,7 @@
 #include "command.h"
 #include "logmessage.h"
 
-static void md5sum_print(char out[], int n)
+static void md5sum_print(void *fg, char out[], int n)
 {
 	char *ch = out;
 	while ((*ch != ' ') && (n--)) {
@@ -18,23 +18,23 @@ static void md5sum_print(char out[], int n)
 
 static void md5sum(int argc, char *argv[])
 {
-	char file_path[MAX_STRING] = {'\0'};
+	char file_path[MAX_STRING];
 
 	LOG("%s\n", __FUNCTION__);
 	
 	if (argc < 2) {
-		FAILED_OUT("too few arguments to command 'md5sum'");
+		FAILED_OUT("too few arguments");
 		return;
 	}
 
-	snprintf(file_path, sizeof(file_path), "%s/%s", GET_CONF_VALUE(CUSLIB_PATH), argv[2]);
+	snprintf(file_path, sizeof(file_path), "%s/%s", GET_CONF_VALUE(CUSLIB_PATH), argv[1]);
 
 	if (access(file_path, 0) < 0) {
 		FAILED_OUT("%s", strerror(errno));
 		return;
 	}
 
-	run_cmd_quiet(md5sum_print, "md5sum %s", file_path);
+	run_cmd_quiet(md5sum_print, NULL, "md5sum %s", file_path);
 }
 BUILDIN_CMD("md5sum", md5sum);
 
@@ -51,7 +51,7 @@ static int update_lib_byname(const char *fullpathname, const char *dest_path)
 	//must be a file
 	ret = access(fullpathname, F_OK|R_OK);
 	if( ret < 0){
-		FAILED_OUT("can't access %s", name);
+		FAILED_OUT("can't access %s", fullpathname);
 		return ret;
 	}
 
@@ -70,7 +70,7 @@ static int update_lib_byname(const char *fullpathname, const char *dest_path)
 	}
 
 	chdir(dest_path);
-	ret = run_cmd_quiet(NULL, "cp %s .", fullpathname);
+	ret = run_cmd_quiet(NULL, NULL, "cp %s .", fullpathname);
 	if ( ret < 0)
 		return ret;
 	len = strlen(postfix);
@@ -81,7 +81,7 @@ static int update_lib_byname(const char *fullpathname, const char *dest_path)
 		if(*lp=='.'){
 			*lp=0;
 			unlink(name);
-			ret = run_cmd_quiet(NULL, "ln -s %s %s", fullname, name);
+			ret = run_cmd_quiet(NULL, NULL, "ln -s %s %s", fullname, name);
 			if(ret < 0)
 				return ret;
 		}
@@ -102,7 +102,8 @@ static void update_lib(int argc, char *argv[])
 	}
 
 	for(argv++; argc>=2; argv++, argc--){
-		update_lib_byname(*argv, dest_path);
+		if(update_lib_byname(*argv, dest_path)<0)
+			return;
 	}
 
 	SUCESS_OUT();

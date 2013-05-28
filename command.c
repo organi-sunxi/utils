@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 
 #include "command.h"
@@ -177,7 +178,7 @@ int set_conf_file(const char *conf_file, const char *key, const char *value)
 	return 0;
 }
 
-int run_cmd_quiet(out_callback_fun fn, const char * format,...)
+int run_cmd_quiet(out_callback_fun fn, void *fg, const char * format,...)
 {
 	FILE *fp;
 	int rc;
@@ -195,7 +196,7 @@ int run_cmd_quiet(out_callback_fun fn, const char * format,...)
 
 	while(fgets(cmd, sizeof(cmd), fp) != NULL){
 		if(fn)
-			fn(cmd, sizeof(cmd));
+			fn(fg, cmd, sizeof(cmd));
 	}
 
 	rc = pclose(fp);
@@ -205,7 +206,7 @@ int run_cmd_quiet(out_callback_fun fn, const char * format,...)
 	}
 
 	if(WEXITSTATUS(rc)!=0){
-		FAILED_OUT("exit code %d", WEXITSTATUS(rc));
+		FAILED_OUT("%s", strerror(errno));
 		return -1;
 	}
 	
@@ -223,6 +224,17 @@ const char* get_filename(const char* fullpathname)
 
 	return pos;
 } 
+
+unsigned long get_file_size(const char *filename)
+{
+	struct stat buf;
+	if(stat(filename, &buf)<0){
+		FAILED_OUT("%s", strerror(errno));
+		return 0;
+	}
+
+	return (unsigned long)buf.st_size;
+}
 
 
 #define STATE_WHITESPACE (0)

@@ -10,6 +10,8 @@
 #include <net/if_arp.h>
 #include <linux/if.h>
 #include <getopt.h>
+#include <linux/fb.h>
+#include <fcntl.h>
 
 #include "command.h"
 #include "logmessage.h"
@@ -158,18 +160,15 @@ static void set_ip(int argc, char *argv[])
 }
 BUILDIN_CMD("set-ip", set_ip);
 
-static char s_lcdtimings_buf[MAX_STRING*50];
-static int s_lcdindex;
 struct lcdinfo{
 	char *lcdname;
 	char *lcdparam;
 };
 
-static void get_all_lcds(char out[], int n)
+static void get_all_lcds(char *buf, char out[], int n)
 {
-	strncat(s_lcdtimings_buf, out, sizeof(s_lcdtimings_buf));
+	strcat(buf, out);
 }
-
 
 #define STATE_FIND_LCDNAME	0
 #define STATE_LCDNAME		1
@@ -178,12 +177,13 @@ static void get_all_lcds(char out[], int n)
 
 static int parse_all_lcds(int *n, struct lcdinfo *info)
 {
+	static char s_lcdtimings_buf[MAX_STRING*50];
 	char *ch = s_lcdtimings_buf;
 	int state = STATE_FIND_LCDNAME, ret;
 	int len;
 
 	*ch = 0;
-	ret = run_cmd_quiet(get_all_lcds, "%s", "fw_printenv lcdtimings");
+	ret = run_cmd_quiet((out_callback_fun)get_all_lcds, ch, "%s", "fw_printenv lcdtimings");
 	if ( ret < 0)
 		return ret;
 
@@ -231,19 +231,20 @@ static int parse_all_lcds(int *n, struct lcdinfo *info)
 	return len;
 }
 
-static void lcd_index_content(char out[], int n)
+static void lcd_index_content(int *lcdindex, char out[], int n)
 {
-	s_lcdindex = -1;
-	sscanf(out, "lcdindex=%d\n", &s_lcdindex);
+	sscanf(out, "lcdindex=%d\n", lcdindex);
 }
 
 static int get_lcd_index()
 {
-	if (run_cmd_quiet(lcd_index_content, "%s", "fw_printenv lcdindex") < 0) {
+	int lcdindex = -1;
+
+	if (run_cmd_quiet((out_callback_fun)lcd_index_content, &lcdindex, "%s", "fw_printenv lcdindex") < 0) {
 		return -1;
 	}
 
-	return s_lcdindex;
+	return lcdindex;
 }
 
 static void get_lcd(int argc, char *argv[])
@@ -268,16 +269,20 @@ static void get_lcd(int argc, char *argv[])
 }
 BUILDIN_CMD("get-lcd", get_lcd);
 
-#define LCDMODE_SET			0
-#define LCDMODE_SETCUR		1
-#define LCDMODE_SETINDEX	2
-#define LCDMODE_RM			3
 
+#define set_lcd_index(i) run_cmd_quiet(NULL, NULL, "fw_setenv lcdindex %d", i)
 static void set_lcd(int argc, char *argv[])
 {
+	enum lcdinfo_mode{
+		LCDMODE_SET,
+		LCDMODE_SETCUR,
+		LCDMODE_SETINDEX,
+		LCDMODE_RM,
+	}mode = LCDMODE_SET;
+
 	struct lcdinfo lcdinfo[MAX_ARGS];
 	char *setcmd, *lcdname=NULL, *lcdparam=NULL, *p;
-	int buf_size, nlcd, mode=LCDMODE_SET, i, mach=0;
+	int buf_size, nlcd, i, mach=0;
 	int next_option;
 	const char*const short_options ="ci:r:";
 	
@@ -307,7 +312,7 @@ static void set_lcd(int argc, char *argv[])
 	}
 
 	if(mode == LCDMODE_SETINDEX){
-		if(run_cmd_quiet(NULL, "fw_setenv lcdindex %d", i)==0)
+		if(set_lcd_index(i)==0)
 			SUCESS_OUT();
 		return;
 	}
@@ -335,14 +340,14 @@ static void set_lcd(int argc, char *argv[])
 			if(mode == LCDMODE_RM){
 				int index = get_lcd_index();
 				if(i<index){
-					run_cmd_quiet(NULL, "fw_setenv lcdindex %d", index-1);
+					set_lcd_index(index-1);
 				}
 				continue;
 			}
 
 			p += sprintf(p, "%s %s\n", lcdname, lcdparam);
 			if (mode == LCDMODE_SETCUR){
-				if(run_cmd_quiet(NULL, "fw_setenv lcdindex %d", i)<0)
+				if(set_lcd_index(i)<0)
 					goto failed1;
 			}
 			continue;
@@ -359,13 +364,13 @@ static void set_lcd(int argc, char *argv[])
 		else{
 			p += sprintf(p, "%s %s\n", lcdname, lcdparam);
 			if (mode == LCDMODE_SETCUR){
-				if(run_cmd_quiet(NULL, "fw_setenv lcdindex %d", i)<0)
+				if(set_lcd_index(i)<0)
 					goto failed1;
 			}
 		}
 	}
 
-	if(run_cmd_quiet(NULL, "%s\"", setcmd)<0)
+	if(run_cmd_quiet(NULL, NULL, "%s\"", setcmd)<0)
 		goto failed1;
 
 	SUCESS_OUT();
@@ -540,15 +545,129 @@ static void set_bklight(int argc, char *argv[])
 }
 BUILDIN_CMD("set-bklight", set_bklight);
 
+struct fb_info
+{
+	int width, height;
+	int bpp;
+};
+
+static int get_fb_info(struct fb_info *fbinfo)
+{
+	int fb;
+	
+	struct fb_var_screeninfo fb_vinfo;
+
+	fb = open (GET_CONF_VALUE(FRAMEBUFFER), O_RDWR);
+	if(fb<0){
+		FAILED_OUT("open fb device");
+		return fb;
+	}
+
+	if (ioctl(fb, FBIOGET_VSCREENINFO, &fb_vinfo)) {
+		FAILED_OUT("Can't get VSCREENINFO\n");
+		close(fb);
+		return -1;
+	}
+
+	fbinfo->bpp= fb_vinfo.red.length + fb_vinfo.green.length +
+                fb_vinfo.blue.length + fb_vinfo.transp.length;
+
+	fbinfo->width = fb_vinfo.xres;
+	fbinfo->height = fb_vinfo.yres;
+
+	close(fb);
+	return 0;
+}
+
+static void splash_size_content(int *size, char out[], int n)
+{
+	if(sscanf(out, "splashsize=%x\n", size)!=1)
+		FAILED_OUT("get size error");
+}
+
+static int get_splash_size()
+{
+	int size = -1;
+
+	if (run_cmd_quiet((out_callback_fun)splash_size_content, &size, "%s", "fw_printenv splashsize") < 0) {
+		return -1;
+	}
+
+	return size;
+}
+
 static void get_splash(int argc, char *argv[])
 {
-	printf("get splash\n");
+	struct fb_info fbinfo;
+	const char *tmppath = GET_CONF_VALUE(TMPFILE_PATH);
+	int size, ret;
+
+	LOG("%s\n", __FUNCTION__);
+	if (argc < 2) {
+		FAILED_OUT("too few arguments");
+		return;
+	}
+
+	size = get_splash_size();
+	if(size<=0)
+		return;
+
+	ret = run_cmd_quiet(NULL, NULL, 
+		"dd if=%s of=%s/splash.bin count=1 bs=%d 2>/dev/null", 
+		GET_CONF_VALUE(SPLASH_DEVICE), tmppath, size);
+	if(ret<0)
+		return;
+
+	if(get_fb_info(&fbinfo)<0)
+		return;
+
+	ret = run_cmd_quiet(NULL, NULL, "mksplash -t %s/tmpfile -rd -b%d -o %s %s/splash.bin", 
+		tmppath, fbinfo.bpp, argv[1], tmppath);
+	if(ret<0)
+		return;
+
+	SUCESS_OUT();
 }
 BUILDIN_CMD("get-splash", get_splash);
-	
+
 static void set_splash(int argc, char *argv[])
 {
-	printf("set splash\n");
+	struct fb_info fbinfo;
+	const char *tmppath = GET_CONF_VALUE(TMPFILE_PATH), *splashdev=GET_CONF_VALUE(SPLASH_DEVICE);
+	char cmd[MAX_STRING];
+	int ret;
+	unsigned long size;
+
+	LOG("%s\n", __FUNCTION__);
+	if (argc < 2) {
+		FAILED_OUT("too few arguments");
+		return;
+	}
+
+	if(get_fb_info(&fbinfo)<0)
+		return;
+
+	ret = run_cmd_quiet(NULL, NULL, "mksplash -t %s/tmpfile -d -b%d -o %s/splash.bin %s", 
+		tmppath, fbinfo.bpp, tmppath, argv[1]);
+	if(ret<0)
+		return;
+
+	snprintf(cmd, sizeof(cmd), "%s/splash.bin", tmppath);
+	size = get_file_size(cmd);
+	if(size==0){
+		FAILED_OUT("make splash error");
+		return;
+	}
+
+	ret = run_cmd_quiet(NULL, NULL, 
+		"flash_eraseall %s && nandwrite -p %s %s/splash.bin && fw_setenv splashsize %x", 
+		splashdev, splashdev, tmppath, size);
+	if(ret<0){
+		FAILED_OUT("write splash error");
+		return;
+	}
+
+	SUCESS_OUT();
 }
 BUILDIN_CMD("set-splash", set_splash);
 

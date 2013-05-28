@@ -14,13 +14,17 @@ typedef struct
 #define MAX_STRING 1024
 
 const char* get_filename(const char* fullpathname);
+unsigned long get_file_size(const char *filename);
+
 int read_device_line(const char *file, char *value, int size);
 int write_device_line(const char *file, char *value);
 int get_conf_file(const char *conf_file, const char *key, char *value);
 int set_conf_file(const char *conf_file, const char *key, const char *value);
-typedef void (*out_callback_fun)(char out[], int n);
+
+
+typedef void (*out_callback_fun)(void *fg, char out[], int n);
 const char* get_env_default(const char* env, const char *def);
-int run_cmd_quiet(out_callback_fun fn, const char * format, ...);
+int run_cmd_quiet(out_callback_fun fn, void *fg, const char * format, ...);
 
 #define FAILED_OUT_HELPER(fmt, ...) printf("failed["fmt"]\n", __VA_ARGS__)
 #define FAILED_OUT(...)	FAILED_OUT_HELPER(__VA_ARGS__, 0)
