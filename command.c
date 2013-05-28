@@ -102,7 +102,7 @@ int run_cmd_quiet(out_callback_fun fn, const char * format,...)
 {
 	FILE *fp;
 	int rc;
-	char cmd[1024];
+	static char cmd[4096];
 	va_list arg_ptr;
 	va_start(arg_ptr, format);
 	vsnprintf(cmd, sizeof(cmd), format, arg_ptr);

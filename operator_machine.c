@@ -9,13 +9,12 @@
 #include <sys/ioctl.h>
 #include <net/if_arp.h>
 #include <linux/if.h>
+#include <getopt.h>
+
 #include "command.h"
 #include "logmessage.h"
 
 #define MAX_ARGS 50
-
-static char s_lcdtimings_buf[MAX_STRING];
-static char s_lcdindex_buf[MAX_STRING];
 
 static void platform(int argc, char *argv[])
 {
@@ -159,166 +158,265 @@ static void set_ip(int argc, char *argv[])
 }
 BUILDIN_CMD("set-ip", set_ip);
 
-#define STATE_WHITESPACE (0)
-#define STATE_WORD (1)
-static void parse_all_lcds(char *lcdbuf, int *argc, char **argv)
-{
-	char *ch = lcdbuf;
-	int state = STATE_WHITESPACE;
+static char s_lcdtimings_buf[MAX_STRING*50];
+static int s_lcdindex;
+struct lcdinfo{
+	char *lcdname;
+	char *lcdparam;
+};
 
-	argv[0]=ch;
-	if (strncmp(lcdbuf, "lcdtimings=", 11) == 0) {
-		strcpy(lcdbuf, lcdbuf + 11);	
+static void get_all_lcds(char out[], int n)
+{
+	strncat(s_lcdtimings_buf, out, sizeof(s_lcdtimings_buf));
+}
+
+
+#define STATE_FIND_LCDNAME	0
+#define STATE_LCDNAME		1
+#define STATE_FIND_LCDPARAM	2
+#define STATE_LCDPARAM		3
+
+static int parse_all_lcds(int *n, struct lcdinfo *info)
+{
+	char *ch = s_lcdtimings_buf;
+	int state = STATE_FIND_LCDNAME, ret;
+	int len;
+
+	*ch = 0;
+	ret = run_cmd_quiet(get_all_lcds, "%s", "fw_printenv lcdtimings");
+	if ( ret < 0)
+		return ret;
+
+	len = strlen(s_lcdtimings_buf);
+
+	if (strncmp(s_lcdtimings_buf, "lcdtimings=", 11) == 0) {
+		ch = s_lcdtimings_buf + 11;
+	}
+	else{
+		FAILED_OUT("can't find lcd timings");
+		return -1;
 	}
 
-	for (*argc = 0; *ch != '\0'; ch++) {
+	for (*n = 0; *ch != '\0'; ch++) {
 		if (*ch == '\n') {
-			*ch = '\0';
-			state = STATE_WHITESPACE;
+			*ch = 0;
+			state = STATE_FIND_LCDNAME;
 			continue;
 		}
 
-		if (state == STATE_WHITESPACE){
-			argv[*argc] = ch;
-			(*argc)++;
-			state = STATE_WORD;
+		switch(state){
+		case STATE_FIND_LCDNAME:
+			if(*ch!=' '){
+				state = STATE_LCDNAME;
+				info->lcdname = ch;
+			}
+			break;
+		case STATE_LCDNAME:
+			if(*ch==' '){
+				state = STATE_FIND_LCDPARAM;
+				*ch = 0;
+			}
+			break;
+		case STATE_FIND_LCDPARAM:
+			if(*ch!=' '){
+				state = STATE_LCDPARAM;
+				info->lcdparam = ch;
+				(*n)++;
+				info++;
+			}
+			break;
 		}
 	}
+
+	return len;
 }
 
 static void lcd_index_content(char out[], int n)
 {
-	strncat(s_lcdindex_buf, out, n);
+	s_lcdindex = -1;
+	sscanf(out, "lcdindex=%d\n", &s_lcdindex);
 }
 
 static int get_lcd_index()
 {
-	memset(s_lcdindex_buf, 0, sizeof(s_lcdindex_buf));
 	if (run_cmd_quiet(lcd_index_content, "%s", "fw_printenv lcdindex") < 0) {
 		return -1;
 	}
 
-	if (strncmp(s_lcdindex_buf, "lcdindex=", 9) == 0) {
-		return atoi(&s_lcdindex_buf[9]);
-	}
-
-	return -1;
-}
-
-static void get_all_lcds(char out[], int n)
-{
-	strncat(s_lcdtimings_buf, out, n);
+	return s_lcdindex;
 }
 
 static void get_lcd(int argc, char *argv[])
 {
-	char *lcd_argv[MAX_ARGS];
-	int lcd_argc;
+	struct lcdinfo lcdinfo[MAX_ARGS];
+	int nlcd;
 	int index = -1;
 	
 	LOG("%s\n", __FUNCTION__);
 
 	index = get_lcd_index();
 
-	memset(s_lcdtimings_buf, 0, sizeof(s_lcdtimings_buf));
-	if (run_cmd_quiet(get_all_lcds, "%s", "fw_printenv lcdtimings") < 0)
+	if(parse_all_lcds(&nlcd, lcdinfo)<0)
 		return;
-
-	memset(lcd_argv, 0, sizeof(lcd_argv));
-	parse_all_lcds(s_lcdtimings_buf, &lcd_argc, lcd_argv); 
 	
-	if ((index >= 0) && (index < lcd_argc)) {
-		printf("%s\n", lcd_argv[index]);
+	if ((index >= 0) && (index < nlcd)) {
+		printf("%s %s\n", lcdinfo[index].lcdname, lcdinfo[index].lcdparam);
 		return;
 	}
 
-	FAILED_OUT("indexlcd is error");
+	FAILED_OUT("error lcd index");
 }
 BUILDIN_CMD("get-lcd", get_lcd);
 
+#define LCDMODE_SET			0
+#define LCDMODE_SETCUR		1
+#define LCDMODE_SETINDEX	2
+#define LCDMODE_RM			3
+
 static void set_lcd(int argc, char *argv[])
-{ 
-	char *lcd_argv[MAX_ARGS];	
-	char *set_buf; 
-	int buf_size;
-	int lcd_argc;
-	int i;
+{
+	struct lcdinfo lcdinfo[MAX_ARGS];
+	char *setcmd, *lcdname=NULL, *lcdparam=NULL, *p;
+	int buf_size, nlcd, mode=LCDMODE_SET, i, mach=0;
+	int next_option;
+	const char*const short_options ="ci:r:";
 	
 	LOG("%s\n", __FUNCTION__);
 
-	if (argc < 3) {
-		FAILED_OUT("too few arguments to function 'set-date'");
+	optind=1;
+
+	do {
+		next_option =getopt(argc,argv,short_options); 
+		switch (next_option){
+		case 'c':
+			mode = LCDMODE_SETCUR;
+			break;
+		case 'i':
+			mode = LCDMODE_SETINDEX;
+			i = strtol(optarg, NULL, 0);
+			break; 
+		case 'r':
+			mode = LCDMODE_RM;
+			lcdname = optarg;
+			lcdparam = "";
+			break; 
+		case -1:	//Done with options.
+			break; 
+		default:
+			FAILED_OUT("arguments error");
+			return;
+		}
+	}while (next_option !=-1); 
+
+	if(mode == LCDMODE_SETINDEX){
+		if(run_cmd_quiet(NULL, "fw_setenv lcdindex %d", i)==0)
+			SUCESS_OUT();
 		return;
 	}
 
-	memset(s_lcdtimings_buf, 0, sizeof(s_lcdtimings_buf));
-	if (run_cmd_quiet(get_all_lcds, "%s", "fw_printenv lcdtimings") < 0)
-		return; 
-	
-	parse_all_lcds(s_lcdtimings_buf, &lcd_argc, lcd_argv);
+	if(mode == LCDMODE_SET || mode == LCDMODE_SETCUR){
+		if(argc < optind+2){
+			FAILED_OUT("too few arguments");
+			return;
+		}
+		lcdname = argv[optind];
+		lcdparam = argv[optind+1];
+	}
 
-	buf_size = sizeof(s_lcdtimings_buf) + strlen(argv[argc - 1]) + 1;
-	set_buf = (char *)malloc(buf_size); 
-	memset(set_buf, 0, buf_size);
-	strcpy(set_buf, "fw_setenv lcdtimings \"");
+	buf_size = parse_all_lcds(&nlcd, lcdinfo);
+	if(buf_size<=0)
+		return;
+
+	buf_size += strlen(lcdname) + strlen(lcdparam) + 10;
+	p = setcmd = (char *)malloc(buf_size);
+	p += sprintf(p, "fw_setenv lcdtimings \"");
 	
-	i = 0;
-	while (i < lcd_argc) {
-		if (strncmp(lcd_argv[i], argv[argc - 2], 
-						strlen(argv[argc - 2 ])) == 0) {
-			break;
+	for (i = 0; i < nlcd; i++){
+		if (strcmp(lcdinfo[i].lcdname, lcdname) == 0 ){
+			mach = 1;
+			if(mode == LCDMODE_RM){
+				int index = get_lcd_index();
+				if(i<index){
+					run_cmd_quiet(NULL, "fw_setenv lcdindex %d", index-1);
+				}
+				continue;
+			}
+
+			p += sprintf(p, "%s %s\n", lcdname, lcdparam);
+			if (mode == LCDMODE_SETCUR){
+				if(run_cmd_quiet(NULL, "fw_setenv lcdindex %d", i)<0)
+					goto failed1;
+			}
+			continue;
 		}
 
-		strcat(set_buf, lcd_argv[i++]);
-		strcat(set_buf, "\n");
-	}
-	
-	strcat(set_buf, argv[argc - 2]);
-	strcat(set_buf, " ");
-	strcat(set_buf, argv[argc - 1]);
-	strcat(set_buf, "\n");
-
-	if (!strcmp(argv[1], "-c")) {
-		run_cmd_quiet(NULL, "%s\"%d\"", "fw_setenv lcdindex ", i);
+		p += sprintf(p, "%s %s\n", lcdinfo[i].lcdname, lcdinfo[i].lcdparam);
 	}
 
-	i++;
-	while (i < lcd_argc) {
-		strcat(set_buf, lcd_argv[i++]);
-		strcat(set_buf, "\n");
+	if(!mach){
+		if(mode == LCDMODE_RM){
+			FAILED_OUT("can't find lcd %s to delete", lcdname);
+			goto failed1;
+		}
+		else{
+			p += sprintf(p, "%s %s\n", lcdname, lcdparam);
+			if (mode == LCDMODE_SETCUR){
+				if(run_cmd_quiet(NULL, "fw_setenv lcdindex %d", i)<0)
+					goto failed1;
+			}
+		}
 	}
-	strcat(set_buf, "\"");
-	 
-	free(set_buf);
+
+	if(run_cmd_quiet(NULL, "%s\"", setcmd)<0)
+		goto failed1;
+
 	SUCESS_OUT();
+failed1:
+	free(setcmd);
 }
 BUILDIN_CMD("set-lcd", set_lcd);
 
+static void rm_lcd(int argc, char *argv[])
+{
+	struct lcdinfo lcdinfo[MAX_ARGS];
+	int nlcd, i;
+	int index = -1;
+	char *lcdname;
+	
+	LOG("%s\n", __FUNCTION__);
+
+	index = get_lcd_index();
+	parse_all_lcds(&nlcd, lcdinfo);
+
+	if (argc < 2) {
+		FAILED_OUT("too few arguments");
+		return;
+	}
+
+	lcdname = argv[1];
+
+	for (i=0; i <nlcd; i++) {
+		if(strcmp(lcdinfo[i].lcdname, lcdname)==0)
+			
+		printf("%c%s %s\n", i==index ? '*':' ', lcdinfo[i].lcdname, lcdinfo[i].lcdparam);
+	}
+}
+BUILDIN_CMD("rm-lcd", rm_lcd);
 
 static void list_lcd(int argc, char *argv[])
 {
-	char *lcd_argv[MAX_ARGS];
-	int lcd_argc;
+	struct lcdinfo lcdinfo[MAX_ARGS];
+	int nlcd, i;
 	int index = -1;
 	
 	LOG("%s\n", __FUNCTION__);
 
 	index = get_lcd_index();
 
-	memset(s_lcdtimings_buf, 0, sizeof(s_lcdtimings_buf));
-	if (run_cmd_quiet(get_all_lcds, "%s", "fw_printenv lcdtimings") < 0)
-		return; 
+	parse_all_lcds(&nlcd, lcdinfo);
 
-	memset(lcd_argv, 0, sizeof(lcd_argv));
-	parse_all_lcds(s_lcdtimings_buf, &lcd_argc, lcd_argv);
-
-	while (lcd_argc--) {
-		if (lcd_argc != index) {
-			printf(" %s\n", lcd_argv[lcd_argc]);
-		}
-		else {
-			printf("*%s\n", lcd_argv[lcd_argc]);
-		}
+	for (i=0; i <nlcd; i++) {
+		printf("%c%s %s\n", i==index ? '*':' ', lcdinfo[i].lcdname, lcdinfo[i].lcdparam);
 	}
 }
 BUILDIN_CMD("list-lcd", list_lcd);
