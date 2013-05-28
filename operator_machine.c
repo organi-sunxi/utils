@@ -401,7 +401,7 @@ static void get_rotation(int argc, char *argv[])
 {
 	char value[MAX_STRING];
 	FILE *res = NULL;
-	int ret;
+	int ret, a;
 
 	LOG("%s\n", __FUNCTION__);
 	ret = get_conf_file(GET_CONF_VALUE(SYS_CONF), "ROTATE", value);
@@ -411,8 +411,9 @@ static void get_rotation(int argc, char *argv[])
 		return;
 	}
 
-	if(strncmp(value, "Transformed:Rot:", 16)==0){
-		printf("%s\n", value+16);
+	ret = sscanf(value, "Transformed:Rot%d:", &a);
+	if(ret ==1){
+		printf("%d\n", a);
 		return;
 	}
 
@@ -441,10 +442,10 @@ static void set_rotation(int argc, char *argv[])
 	case 90:
 	case 180:
 	case 270:
-		snprintf(value, sizeof(value), "Transformed:Rot:%d", v);
+		snprintf(value, sizeof(value), "Transformed:Rot%d:", v);
 		break;
 	default:
-		FAILED_OUT("error angel");
+		FAILED_OUT("error angle");
 		return;
 	}
 
