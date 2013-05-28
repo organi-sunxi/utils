@@ -13,10 +13,11 @@
 #define SPLASH_MAGIC		0xb87fe731
 
 typedef struct tagBITMAPFILEHEADER {
+	uint8_t hd[2];
 	uint32_t bfSize;
 	uint32_t bfReserved12;
 	uint32_t bfOffBits;
-} BITMAPFILEHEADER, *PBITMAPFILEHEADER;
+} __attribute__((packed)) BITMAPFILEHEADER, *PBITMAPFILEHEADER;
 
 typedef struct tagBITMAPINFOHEADER {
 	uint32_t biSize;
@@ -37,6 +38,28 @@ typedef struct {
 	uint16_t x, y;
 	uint16_t cx, cy;
 }splash_header;
+
+static int bitmap32to24(unsigned char *data, unsigned char *out)
+{
+	memcpy(out, data, 3);
+	return 3;
+}
+
+#define PAD_TAIL(d, n)	(d) |= (((d)&(1<<n)) ? ((1<<n)-1) : 0)
+
+static int bitmap16to24(unsigned char *data, unsigned char *out)
+{
+	uint16_t *p = (uint16_t *)data;
+
+	out[0] = *p<<3;
+	PAD_TAIL(out[0],3);
+	out[1] = (*p>>3)&0xfc;
+	PAD_TAIL(out[1],2);
+	out[2] = (*p>>8)&0xf8;
+	PAD_TAIL(out[2],3);
+
+	return 3;
+}
 
 static int bitmap24to16(unsigned char *data, unsigned char *out)
 {
@@ -61,13 +84,121 @@ struct output_fmt{
 	char *infilename;
 	char *outfilename;
 	char *tmpfilename;
-	int (*bitmap24to)(unsigned char *, unsigned char *);
+	int (*bitmapto)(unsigned char *, unsigned char *);
 };
+
+static int splash2bmp(struct output_fmt *fmt)
+{
+	splash_header splashhd;
+	char buf[1024], data[4], od[4];
+	int byteperline, w, h, ret, byteperpixel;
+	FILE *pfin, *pfout;
+	BITMAPFILEHEADER bmpfileheader;
+	BITMAPINFOHEADER bmpinfoheader;
+
+	pfin = fopen(fmt->infilename, "r");
+	if(pfin==NULL){
+		printf("file %s open failed\n", fmt->infilename);
+		return -1;
+	}
+
+	if(fmt->uimage){
+		printf("not support uImage file\n");
+		return -1;
+	}
+
+	fread(&splashhd, sizeof(splashhd), 1, pfin);
+	if(splashhd.magic != SPLASH_MAGIC){
+		printf("wrong splash file %s\n", fmt->infilename);
+		return -1;
+	}
+
+	//write splash data to tmp.gz file
+	snprintf(buf, sizeof(buf), "%s.gz", fmt->tmpfilename);
+	pfout = fopen(buf, "w");
+	if(pfout==NULL){
+		printf("file %s creat failed\n", buf);
+		return -1;
+	}
+	while(ret=fread(buf, 1, sizeof(buf),  pfin)){
+		fwrite(buf, 1, ret, pfout);
+	}
+
+	fclose(pfin);
+	fclose(pfout);
+
+	snprintf(buf, sizeof(buf), "gunzip -f %s.gz", fmt->tmpfilename);
+	ret = system(buf);
+	if(ret){
+		printf("decompress error\n");
+		return -1;
+	}
+	else
+		printf("decompress done\n");
+
+	//gunzip into tmp file
+	pfin = fopen(fmt->tmpfilename, "r");
+	if(pfin==NULL){
+		printf("file %s open failed\n", fmt->tmpfilename);
+		return -1;
+	}
+
+	pfout = fopen(fmt->outfilename, "w");
+	if(pfout==NULL){
+		printf("file %s creat failed\n", fmt->outfilename);
+		return -1;
+	}
+
+	//initialize bitmap header
+	memset(&bmpfileheader, 0, sizeof(bmpfileheader));
+	memset(&bmpinfoheader, 0, sizeof(bmpinfoheader));
+	bmpfileheader.hd[0]='B';
+	bmpfileheader.hd[1]='M';
+
+	byteperpixel = fmt->bit/8;
+	byteperline = splashhd.cx * byteperpixel;
+
+	bmpfileheader.bfOffBits = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
+	bmpfileheader.bfSize= bmpfileheader.bfOffBits + splashhd.cx*splashhd.cy*3;
+
+	bmpinfoheader.biSize = sizeof(BITMAPINFOHEADER);
+	bmpinfoheader.biWidth = splashhd.cx;
+	bmpinfoheader.biHeight= splashhd.cy;
+	bmpinfoheader.biPlanes = 1;
+	bmpinfoheader.biBitCount = 24;
+	bmpinfoheader.biSizeImage = splashhd.cy*byteperline;
+
+	fwrite(&bmpfileheader, sizeof(bmpfileheader), 1, pfout);
+	fwrite(&bmpinfoheader, sizeof(bmpinfoheader), 1, pfout);
+
+
+	ret = fseek(pfin, (splashhd.cy-1)*byteperline, SEEK_CUR);
+
+	for(h=0;h<splashhd.cy;h++){
+		for(w=0;w<splashhd.cx;w++){
+			ret = fread(data, byteperpixel, 1, pfin);
+			if(ret <= 0){
+				printf("failed to read\n");
+				goto failed1;
+			}
+			ret = fmt->bitmapto(data, od);
+			fwrite(od, ret, 1, pfout);
+		}
+		fseek(pfin, -2*byteperline, SEEK_CUR);
+	}
+	
+failed1:
+	fclose(pfin);
+	fclose(pfout);
+
+	return 0;
+}
+
 
 static int bmp2splash(struct output_fmt *fmt)
 {
 	FILE *pfin, *pfout;
-	char buf[400], data[4], od[4];
+	char buf[1024], data[4], od[4];
 	int cx, cy, byteperline, w, h;
 	BITMAPFILEHEADER bmpfileheader;
 	BITMAPINFOHEADER bmpinfoheader;
@@ -78,21 +209,18 @@ static int bmp2splash(struct output_fmt *fmt)
 	splashhd.y = fmt->y;
 
 	pfin = fopen(fmt->infilename, "r");
-
 	if(pfin==NULL){
 		printf("file %s open failed\n", fmt->infilename);
 		return -1;
 	}
 
-	fread(buf, 2, 1, pfin);
+	fread(&bmpfileheader, sizeof(BITMAPFILEHEADER), 1, pfin);
+	fread(&bmpinfoheader, sizeof(BITMAPINFOHEADER), 1, pfin);
 
-	if(buf[0]!='B' ||buf[1] !='M'){
+	if(bmpfileheader.hd[0]!='B' || bmpfileheader.hd[1] !='M'){
 		printf("Input file must be bitmap format!\n");
 		return -1;
 	}
-
-	fread(&bmpfileheader, sizeof(BITMAPFILEHEADER), 1, pfin);
-	fread(&bmpinfoheader, sizeof(BITMAPINFOHEADER), 1, pfin);
 
 	cx=bmpinfoheader.biWidth;
 	cy=bmpinfoheader.biHeight;
@@ -135,7 +263,7 @@ static int bmp2splash(struct output_fmt *fmt)
 				printf("failed to read\n");
 				goto failed1;
 			}
-			ret = fmt->bitmap24to(data, od);
+			ret = fmt->bitmapto(data, od);
 			fwrite(od, ret, 1, pfout);
 		}
 		fseek(pfin, -2*byteperline, SEEK_CUR);
@@ -153,7 +281,7 @@ failed1:
 
 	if(ret){
 		printf("compress error\n");
-		return 1;
+		return -1;
 	}
 	else
 		printf("done\n");
@@ -189,11 +317,13 @@ static void show_help(char *name)
 	printf("\t-o\t outpout file(default %s)\n", OUTFILE_NAME);
 	printf("\t-u\t output uboot image\n");
 	printf("\t-a\t uboot image load address(default 0x%x)\n", DEFAULT_LOAD_ADDR);
+	printf("\t-t\t tmporary file name(default %s)\n", TMPFILE_NAME);
+	printf("\t-r\t revert mode, splash file to 24bit bitmap file\n");
 }
 
 int main(int argc, char* argv[])
 {
-	int i;
+	int i, rev=0;
 	struct output_fmt fmt={
 		.bit=16,
 		.uimage=0,
@@ -202,7 +332,7 @@ int main(int argc, char* argv[])
 		.tmpfilename = TMPFILE_NAME,
 		.x=0,
 		.y=0,
-		.bitmap24to=NULL,
+		.bitmapto=NULL,
 	};
 
 	if(argc < 2){
@@ -210,7 +340,7 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
-	while((i = getopt(argc, argv, "hx:y:b:o:a:ut:")) != -1){
+	while((i = getopt(argc, argv, "hx:y:b:o:a:ut:r")) != -1){
         switch(i)
         {
             case 'h':
@@ -224,10 +354,6 @@ int main(int argc, char* argv[])
                 break;
             case 'b':
 				fmt.bit = strtol(optarg, NULL, 0);
-				if(fmt.bit==32)
-					fmt.bitmap24to = bitmap24to32;
-				else if(fmt.bit=16)
-					fmt.bitmap24to = bitmap24to16;
                 break;
             case 'o':
 				fmt.outfilename = optarg;
@@ -241,10 +367,18 @@ int main(int argc, char* argv[])
             case 'a':
 				fmt.loadaddr = strtol(optarg, NULL, 0);
 				break;
+			case 'r':
+				rev = 1;
+				break;
         }
     }
 
-	if(!fmt.bitmap24to){
+	if(fmt.bit==32)
+		fmt.bitmapto = rev ? bitmap32to24 : bitmap24to32;
+	else if(fmt.bit=16)
+		fmt.bitmapto = rev ? bitmap16to24 : bitmap24to16;
+
+	if(!fmt.bitmapto){
 		printf("LCD bit only don't support %d\n", fmt.bit);
 		show_help(argv[0]);
 		return -1;
@@ -257,6 +391,11 @@ int main(int argc, char* argv[])
 	}
 
 	fmt.infilename = argv[optind];
-	bmp2splash(&fmt);
+	if(rev)
+		return splash2bmp(&fmt);
+
+	return bmp2splash(&fmt);
+
+	
 }
 
