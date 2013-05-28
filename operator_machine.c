@@ -284,9 +284,7 @@ static void set_lcd(int argc, char *argv[])
 	LOG("%s\n", __FUNCTION__);
 
 	optind=1;
-
-	do {
-		next_option =getopt(argc,argv,short_options); 
+	while((next_option =getopt(argc,argv,short_options))!=-1) {
 		switch (next_option){
 		case 'c':
 			mode = LCDMODE_SETCUR;
@@ -306,7 +304,7 @@ static void set_lcd(int argc, char *argv[])
 			FAILED_OUT("arguments error");
 			return;
 		}
-	}while (next_option !=-1); 
+	}
 
 	if(mode == LCDMODE_SETINDEX){
 		if(run_cmd_quiet(NULL, "fw_setenv lcdindex %d", i)==0)
@@ -445,10 +443,102 @@ static void set_rotation(int argc, char *argv[])
 		return;
 	}
 
-	set_conf_file(GET_CONF_VALUE(SYS_CONF), "ROTATE", value);
+	if(set_conf_file(GET_CONF_VALUE(SYS_CONF), "ROTATE", value)<0)
+		return;
+
 	SUCESS_OUT();
 }
 BUILDIN_CMD("set-rotation", set_rotation);
+
+static void get_bklight(int argc, char *argv[])
+{
+	char file[MAX_STRING], value[MAX_STRING];
+	int v, max;
+
+	LOG("%s\n", __FUNCTION__);
+
+	snprintf(file, sizeof(file), "%s/%s", GET_CONF_VALUE(SYSPATH_BKLIGHT), "brightness");
+	if(read_device_line(file, value, sizeof(value))<0)
+		return;
+	v = atoi(value);
+
+	snprintf(file, sizeof(file), "%s/%s", GET_CONF_VALUE(SYSPATH_BKLIGHT), "max_brightness");
+	if(read_device_line(file, value, sizeof(value))<0)
+		return;
+
+	max = atoi(value);
+	if(max<=0){
+		FAILED_OUT("max brightness error");
+		return;
+	}
+
+	printf("%d\n", v*100/max);
+}
+BUILDIN_CMD("get-bklight", get_bklight);
+
+static void set_bklight(int argc, char *argv[])
+{
+	char file[MAX_STRING], value[MAX_STRING];
+	int next_option;
+	const char*const short_options ="s";
+	int v, max, save=0;
+
+	LOG("%s\n", __FUNCTION__);
+
+	snprintf(file, sizeof(file), "%s/%s", GET_CONF_VALUE(SYSPATH_BKLIGHT), "max_brightness");
+	if(read_device_line(file, value, sizeof(value))<0)
+		return;
+
+	max = atoi(value);
+	if(max<=0){
+		FAILED_OUT("max brightness error");
+		return;
+	}
+
+	optind=1;
+	while((next_option =getopt(argc,argv,short_options))!=-1) {
+		switch (next_option){
+		case 's':
+			save = 1;
+			break;
+		case -1:	//Done with options.
+			break; 
+		default:
+			FAILED_OUT("arguments error");
+			return;
+		}
+	}
+
+	if(argc < optind+1){
+		if(save){
+			snprintf(file, sizeof(file), "%s/%s", GET_CONF_VALUE(SYSPATH_BKLIGHT), "brightness");
+			if(read_device_line(file, value, sizeof(value))<0)
+				return;
+			v = atoi(value);
+		}
+		else{
+			FAILED_OUT("too few arguments");
+			return;
+		}
+	}
+	else{
+		v = atoi(argv[optind]);
+		v = v*max/100;
+	}
+
+	snprintf(file, sizeof(file), "%s/%s", GET_CONF_VALUE(SYSPATH_BKLIGHT), "brightness");
+	snprintf(value, sizeof(value), "%d", v);
+	if(write_device_line(file, value)<0)
+		return;
+
+	if(save){
+		if(set_conf_file(GET_CONF_VALUE(SYS_CONF), "BACKLIGHT", value)<0)
+			return;
+	}
+		
+	SUCESS_OUT();
+}
+BUILDIN_CMD("set-bklight", set_bklight);
 
 static void get_splash(int argc, char *argv[])
 {
@@ -489,7 +579,7 @@ static void set_date(int argc, char *argv[])
 	LOG("%s\n", __FUNCTION__);
 	
 	if (argc < 2) {
-		FAILED_OUT("too few arguments to command 'set-date'");
+		FAILED_OUT("too few arguments");
 		return;
 	}
 

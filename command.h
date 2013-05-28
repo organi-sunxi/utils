@@ -14,6 +14,8 @@ typedef struct
 #define MAX_STRING 1024
 
 const char* get_filename(const char* fullpathname);
+int read_device_line(const char *file, char *value, int size);
+int write_device_line(const char *file, char *value);
 int get_conf_file(const char *conf_file, const char *key, char *value);
 int set_conf_file(const char *conf_file, const char *key, const char *value);
 typedef void (*out_callback_fun)(char out[], int n);

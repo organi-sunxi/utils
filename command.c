@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include <fcntl.h>
+
 #include "command.h"
 #include "logmessage.h"
 
@@ -53,6 +55,43 @@ const char* get_env_default(const char* env, const char *def)
 		return p;
 
 	return def;
+}
+
+int read_device_line(const char *file, char *value, int size)
+{
+	int fd;
+	int ret;
+	
+	fd = open(file, O_RDONLY);
+	if (fd<0) {
+		FAILED_OUT("%s", strerror(errno));
+		return -1;
+	}
+	ret = read(fd, value, size);
+	if(ret<0)
+		FAILED_OUT("%s", strerror(errno));
+
+	close(fd);
+
+	return ret;
+}
+
+int write_device_line(const char *file, char *value)
+{
+	int fd;
+	int ret;
+	
+	fd = open(file, O_WRONLY);
+	if (fd<0) {
+		FAILED_OUT("%s", strerror(errno));
+		return -1;
+	}
+	ret = write(fd, value, strlen(value));
+	if(ret<0)
+		FAILED_OUT("%s", strerror(errno));
+	close(fd);
+
+	return ret;
 }
 
 int get_conf_file(const char *conf_file, const char *key, char *value)
