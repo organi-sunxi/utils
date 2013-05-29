@@ -7,13 +7,14 @@
 
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/prctl.h>
 
 #include "command.h"
 #include "logmessage.h"
 
 static pid_t qt_run_pid=-1;
 
-int stop_running_app(void)
+static int stop_running_app(void)
 {
 	if(qt_run_pid > 0){
 		kill(qt_run_pid, SIGINT);
@@ -38,6 +39,8 @@ static int run_qtapp(const char *fullpathname, const char *cd)
 	
 	pid = fork();
 	if(pid == 0){//child
+		//emconfig exit will stop this app
+		prctl(PR_SET_PDEATHSIG, SIGHUP);
 		stop_qtapp();
 		if(cd && *cd)
 			chdir(cd);

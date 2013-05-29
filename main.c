@@ -79,9 +79,6 @@ static void set_env(const char *filename)
 	fclose(config_file);
 }
 
-
-extern int stop_running_app(void);
-
 int main(int argc, char *argv[])
 {
 	char cmdline[MAX_COMMAND];
@@ -115,7 +112,6 @@ int main(int argc, char *argv[])
 
 	//to do: set configure file into envirment
 	set_env(conf_filename);
-	atexit(stop_running_app);
 	
 	for (;;) {
 		printf(">");
