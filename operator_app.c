@@ -20,7 +20,11 @@ static int stop_running_app(void)
 		kill(qt_run_pid, SIGINT);
 		waitpid(qt_run_pid, NULL, WNOHANG);
 		qt_run_pid = -1;
+
+		return 0;
 	}
+
+	return 0;
 }
 
 static int stop_qtapp()
@@ -79,7 +83,8 @@ static void stop(int argc, char *argv[])
 {
 	LOG("%s\n", __FUNCTION__);
 
-	stop_running_app();
+	if(stop_running_app()==0)
+		SUCESS_OUT();
 }
 BUILDIN_CMD("stop", stop);
 
