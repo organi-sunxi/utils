@@ -56,7 +56,7 @@ static int update_lib_byname(const char *fullpathname, const char *dest_path)
 	}
 
 	//name must be /path/filename.so or /path/filename.so.x...
-	fullname = get_filename(fullpathname);
+	fullname = get_filename(fullpathname,NULL);
 	strncpy(name, fullname, sizeof(name));
 
 	for(lp = strstr(name, ".so"); lp!=NULL; lp = strstr(lp, ".so")){

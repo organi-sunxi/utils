@@ -190,7 +190,41 @@ BUILDIN_CMD("remove-fastapp", remove_fastapp);
 
 static void update_fw(int argc, char *argv[])
 {
-	printf("update fw\n");
+	const char *filename, *updateapp=GET_CONF_VALUE(UPDATE_FW_APPNAME),
+		*tmppath=GET_CONF_VALUE(TMPFILE_PATH);
+	char cmd[MAX_STRING];
+	int ret;
+	
+	LOG("%s\n", __FUNCTION__);
+
+	if (argc < 2) {
+		FAILED_OUT("too few arguments");
+		return;
+	}
+	
+
+	filename = argv[1];
+
+	PROGRESS_OUT(0, "update begin");
+
+	//set PLATFORM env for update script
+	setenv("PLATFORM", GET_CONF_VALUE(PLATFORM), 1);
+
+	chdir(tmppath);
+	snprintf(cmd, sizeof(cmd), "tar xf %s", filename);
+	if(system(cmd)!=0){
+		FAILED_OUT("update file decompress error");
+		return;
+	}
+	PROGRESS_OUT(25, "decompress and crc ok");
+
+	snprintf(cmd, sizeof(cmd), "./%s", updateapp);
+	if(system(cmd)!=0){
+		FAILED_OUT("update error");
+		return;
+	}
+
+	SUCESS_OUT();
 }
 BUILDIN_CMD("update-fw", update_fw);
 

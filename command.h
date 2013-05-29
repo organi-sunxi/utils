@@ -13,7 +13,7 @@ typedef struct
 
 #define MAX_STRING 1024
 
-const char* get_filename(const char* fullpathname);
+const char* get_filename(const char* fullpathname, char *path);
 unsigned long get_file_size(const char *filename);
 
 int read_device_line(const char *file, char *value, int size);

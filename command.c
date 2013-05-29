@@ -213,15 +213,27 @@ int run_cmd_quiet(out_callback_fun fn, void *fg, const char * format,...)
 	return 0;
 }
 
-const char* get_filename(const char* fullpathname)
+const char* get_filename(const char* fullpathname, char *path)
 {
 	const char *p, *pos;
+	int n;
 
 	for(pos = p = fullpathname; *p!=0; p++){
 		if(*p == '/')
 			pos = p+1;
 	}
 
+	if(!path)
+		return pos;
+
+	n = pos-fullpathname;
+	*path = 0;
+	if(n==0)
+		return pos;
+
+	memcpy(path, fullpathname, n);
+	path[n+1]=0;
+	
 	return pos;
 } 
 
