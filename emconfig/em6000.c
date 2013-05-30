@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <getopt.h>
 
 #include <linux/fb.h>
 
@@ -46,11 +47,32 @@ static char *get_lcd_pol(char* str, enum fb_pol *pol)
 	return str;
 }
 
+static int str2fbinfo(const char *buf, struct fb_info *fi)
+{
+	int ret;
+	char suffix[128];
+	
+	//[width]x[height]@[PCLK(KHz)],[HFP]:[HSW]:[HBP],[VFP]:[VSW]:[VBP],BODPHV
+	ret = sscanf(buf, "%dx%d@%d,%d:%d:%d,%d:%d:%d%[^#]",
+		&fi->width, &fi->height, &fi->pclk, 
+		&fi->hfp, &fi->hsw, &fi->hbp,
+		&fi->vfp, &fi->vsw, &fi->vbp, suffix);
+	if(ret<9)
+		return -1;
+
+	if(ret==9)
+		fi->pol=0;
+	else
+		get_lcd_pol(suffix, &fi->pol);
+
+	return 0;
+}
+
 //return match lcdindex or -1
 static int em6000_load_lcds(int *nlcd, struct local_lcd_info *lcdinfo, struct fb_info *fbinfo)
 {
 	FILE *pf;
-	char buf[MAX_STRING], suffix[128], *p;
+	char buf[MAX_STRING], *p;
 	int ret, i, v, match=-1, n;
 
 	if(fbinfo){
@@ -72,20 +94,12 @@ static int em6000_load_lcds(int *nlcd, struct local_lcd_info *lcdinfo, struct fb
 		if(*p=='#')	//ignore line
 			continue;
 
-		//[width]x[height]@[PCLK(KHz)],[HFP]:[HSW]:[HBP],[VFP]:[VSW]:[VBP],BODPHV
-		ret = sscanf(buf, "%s%dx%d@%d,%d:%d:%d,%d:%d:%d%[^#]",lcdinfo->name, 
-			&lcdinfo->info.width, &lcdinfo->info.height, &lcdinfo->info.pclk, 
-			&lcdinfo->info.hfp, &lcdinfo->info.hsw, &lcdinfo->info.hbp,
-			&lcdinfo->info.vfp, &lcdinfo->info.vsw, &lcdinfo->info.vbp, suffix);
-		if(ret<10)
+		ret = sscanf(p, "%s%n", lcdinfo->name, &n);
+		if(ret!=1)
 			continue;
+		p += n;
 
-		if(ret==10)
-			lcdinfo->info.pol=0;
-		else
-			get_lcd_pol(suffix, &lcdinfo->info.pol);
-
-		if(!fbinfo)
+		if(str2fbinfo(p, &lcdinfo->info)<0 || !fbinfo)
 			continue;
 
 		v = lcdinfo->info.pclk >= fbinfo->pclk ? (lcdinfo->info.pclk - fbinfo->pclk) : 
@@ -200,4 +214,110 @@ static void em6000_list_lcd(int argc, char *argv[])
 	free(plcdinfo);
 }
 BUILDIN_CMD("list-lcd", em6000_list_lcd, match_em6000);
+
+static int set_lcd_info(struct fb_info *fbinfo)
+{
+
+}
+
+static void em6000_set_lcd(int argc, char *argv[])
+{
+	enum lcdinfo_mode{
+		LCDMODE_SET,
+		LCDMODE_SETCUR,
+		LCDMODE_SETINDEX,
+		LCDMODE_RM,
+	}mode = LCDMODE_SET;
+
+	struct local_lcd_info *plcdinfo=malloc(MAX_LCD_LIST*sizeof(struct local_lcd_info));
+	struct fb_info fbinfo;
+	char *lcdname, *lcdparam, cmd[MAX_STRING];
+	int nlcd, i, match;
+	int next_option;
+	const char*const short_options ="ci:r:";
+	
+	LOG("%s\n", __FUNCTION__);
+
+	optind=0;
+	while((next_option =getopt(argc,argv,short_options))!=-1) {
+		switch (next_option){
+		case 'c':
+			mode = LCDMODE_SETCUR;
+			break;
+		case 'i':
+			mode = LCDMODE_SETINDEX;
+			i = strtol(optarg, NULL, 0);
+			break; 
+		case 'r':
+			mode = LCDMODE_RM;
+			lcdname = optarg;
+			lcdparam = "";
+			break; 
+		case -1:	//Done with options.
+			break; 
+		default:
+			FAILED_OUT("arguments error");
+			return;
+		}
+	}
+
+	match = em6000_load_lcds(&nlcd, plcdinfo, &fbinfo);
+
+	if(mode == LCDMODE_SETINDEX){
+		if(match!=i){
+			if(i>=nlcd){
+				FAILED_OUT("out of lcd list range");
+				goto out;
+			}
+			if(set_lcd_info(&plcdinfo[i].info)<0)
+				goto out;
+		}
+		SUCESS_OUT();
+		goto out;
+	}
+
+	if(mode == LCDMODE_SET || mode == LCDMODE_SETCUR){
+		if(argc < optind+2){
+			FAILED_OUT("too few arguments");
+			goto out;
+		}
+		lcdname = argv[optind];
+		lcdparam = argv[optind+1];
+
+		if(str2fbinfo(lcdparam, &fbinfo)<0){
+			FAILED_OUT("lcd parameter format error");
+			goto out;
+		}
+
+		if(run_cmd_quiet(NULL, NULL, 
+			"sed -e 's/^[[:space:]]*//g' "LCD_LIST_FILE" | grep \'^\\<%s\\>\'>/dev/null && \\"
+			"sed -i -e 's/^[[:space:]]*//g;s/^\\<%s\\>.*$/%s/g' "LCD_LIST_FILE" || \\"
+			"echo %s >> "LCD_LIST_FILE, lcdname, lcdname, lcdparam, lcdparam)<0)
+			goto out;
+
+		if(mode == LCDMODE_SETCUR){
+			if(set_lcd_info(&fbinfo)<0)
+				goto out;
+		}
+
+		SUCESS_OUT();
+		return;
+	}
+
+	if(mode == LCDMODE_RM){
+		if(strcmp(plcdinfo[match].name,lcdname) == 0){
+			FAILED_OUT("can't delete current lcd");
+			goto out;
+		}
+		if(run_cmd_quiet(NULL, NULL, 
+			"sed -i -e \'s/^[[:space:]]*//g;/^<\\%s\\>/d\' "LCD_LIST_FILE, lcdname)<0)
+			goto out;
+
+		SUCESS_OUT();
+	}
+
+out:
+	free(plcdinfo);
+}
+BUILDIN_CMD("set-lcd", em6000_set_lcd, match_em6000);
 

@@ -3,22 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PACK_MAGIC 0x4b434150
-#define PACK_NAME_MAX 32
-
-struct pack_header {
-	uint32_t magic;
-	uint32_t nentry;
-	uint32_t crc;
-};
-
-struct pack_entry {
-	uint32_t offset;
-	uint32_t size;
-	uint32_t ldaddr;
-	uint32_t crc;
-	char name[PACK_NAME_MAX];
-};
+#include "packimg.h"
 
 void print_usage(char *cmd)
 {
@@ -39,7 +24,7 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	pagesize = strtol(argv[1], &end, 16);
+	pagesize = strtol(argv[1], &end, 0);
 	if (end == argv[1]) {
 		fprintf(stderr, "pagesize invalid %s\n", argv[1]);
 		return -1;
@@ -131,8 +116,12 @@ int main(int argc, char **argv)
 	for (i = 0; i < nentry; i++) {
 		fseek(fout, pe[i].offset, SEEK_SET);
 		fwrite(buffer[i], pe[i].size, 1, fout);
+		free(buffer[i]);
 	}
 	fclose(fout);
 
+	free(buffer);
+	free(ph);
+	
 	return 0;
 }
