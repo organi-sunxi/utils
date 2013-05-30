@@ -10,13 +10,11 @@
 #include <net/if_arp.h>
 #include <linux/if.h>
 #include <getopt.h>
-#include <linux/fb.h>
 #include <fcntl.h>
 
+#include "lib.h"
 #include "command.h"
 #include "logmessage.h"
-
-#define MAX_ARGS 50
 
 static void platform(int argc, char *argv[])
 {
@@ -545,40 +543,6 @@ static void set_bklight(int argc, char *argv[])
 	SUCESS_OUT();
 }
 BUILDIN_CMD("set-bklight", set_bklight);
-
-struct fb_info
-{
-	int width, height;
-	int bpp;
-};
-
-static int get_fb_info(struct fb_info *fbinfo)
-{
-	int fb;
-	
-	struct fb_var_screeninfo fb_vinfo;
-
-	fb = open (GET_CONF_VALUE(FRAMEBUFFER), O_RDWR);
-	if(fb<0){
-		FAILED_OUT("open fb device");
-		return fb;
-	}
-
-	if (ioctl(fb, FBIOGET_VSCREENINFO, &fb_vinfo)) {
-		FAILED_OUT("Can't get VSCREENINFO\n");
-		close(fb);
-		return -1;
-	}
-
-	fbinfo->bpp= fb_vinfo.red.length + fb_vinfo.green.length +
-                fb_vinfo.blue.length + fb_vinfo.transp.length;
-
-	fbinfo->width = fb_vinfo.xres;
-	fbinfo->height = fb_vinfo.yres;
-
-	close(fb);
-	return 0;
-}
 
 static void splash_size_content(int *size, char out[], int n)
 {

@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <sys/prctl.h>
 
+#include "lib.h"
 #include "command.h"
 #include "logmessage.h"
 

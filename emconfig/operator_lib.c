@@ -2,6 +2,8 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+
+#include "lib.h"
 #include "command.h"
 #include "logmessage.h"
 

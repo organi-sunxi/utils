@@ -1,5 +1,5 @@
 CC:=arm-none-linux-gnueabi-
-SRC=main.c command.c operator_lib.c operator_machine.c operator_app.c \
+SRC=main.c command.c operator_lib.c operator_machine.c operator_app.c lib.c \
 	em6000.c
 
 OBJ=$(SRC:.c=.o)

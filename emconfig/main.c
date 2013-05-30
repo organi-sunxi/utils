@@ -4,6 +4,7 @@
 #include <getopt.h>
 #include <signal.h>
 
+#include "lib.h"
 #include "command.h"
 #include "logmessage.h"
 
