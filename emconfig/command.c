@@ -276,9 +276,9 @@ static void parse_args(char *cmdline, int *argc, char **argv)
 void deal_command(char *cmdline)
 {
 	char *argv[MAX_ARGS];
-	int index = -1;
-	int argc;
-	int i;
+	int index = -1, argc, i;
+	const char *platform = GET_CONF_VALUE(PLATFORM);
+	void (*pf)(int argc, char *argv[])=NULL;
 
 	command_t *cmd;
 
@@ -289,10 +289,21 @@ void deal_command(char *cmdline)
 		return;
 
 	for (cmd = __start_buildin_cmd; cmd < __stop_buildin_cmd; cmd++){
-		if (!strcmp(argv[0], cmd->command)) {
-			cmd->fun(argc, argv);
-			return;
+		if (strcmp(argv[0], cmd->command)==0){
+			if(!cmd->platform_match){
+				pf = cmd->fun;
+				continue;
+			}
+			if(cmd->platform_match(platform)){
+				cmd->fun(argc, argv);
+				return;
+			}
 		}
+	}
+
+	if(pf){	//no match platform use default
+		pf(argc, argv);
+		return;
 	}
 
 	printf("no %s command!\n", argv[0]);

@@ -19,6 +19,7 @@ static void print_usage (const char*program_name, int exit_code)
 	printf ("-h Display this usage information.\n"
 		"-c <configure file>("DEFAULT_CONFIG_FILE")>\n"
 		"-l <log_file_name>\n"
+		"-p <platform name>("PLATFORM")\n"
 		);
 	exit (exit_code); 
 }
@@ -85,14 +86,15 @@ int main(int argc, char *argv[])
 	const char *conf_filename=DEFAULT_CONFIG_FILE;
 
 	int next_option;
-	const char*const short_options ="hc:l:";
+	const char*const short_options ="hc:l:p:";
 
 	setvbuf(stdout, NULL, _IONBF, 0);
 
-	do {
-		next_option =getopt(argc,argv,short_options); 
-		switch (next_option) 
-		{ 
+	//set configure file into envirment
+	set_env(conf_filename);
+
+	while((next_option=getopt(argc,argv,short_options))!=-1){
+		switch(next_option){ 
 		case 'h':
 			print_usage (argv[0],0);
 			break;
@@ -102,17 +104,15 @@ int main(int argc, char *argv[])
 		case 'l':
 			plogfile = fopen(optarg, "a");
 			LOG("open log file\n");
-			break; 
-		case -1:/*Done with options.*/ 
+			break;
+		case 'p':
+			setenv("PLATFORM", optarg, 1);
 			break; 
 		default:/*Something else:unexpected.*/ 
 			print_usage (argv[0],1); 
 		}
-	}while (next_option !=-1); 
+	} 
 
-	//to do: set configure file into envirment
-	set_env(conf_filename);
-	
 	for (;;) {
 		printf(">");
 		fgets(cmdline, sizeof(cmdline), stdin);

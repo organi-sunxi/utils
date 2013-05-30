@@ -1,23 +1,21 @@
 CC:=arm-none-linux-gnueabi-
+SRC=main.c command.c operator_lib.c operator_machine.c operator_app.c \
+	em6000.c
 
-emconfig:defaultenv.h main.o command.o operator_lib.o operator_machine.o operator_app.o
-	$(CC)gcc -o emconfig main.o command.o operator_lib.o \
-			operator_machine.o operator_app.o
+OBJ=$(SRC:.c=.o)
+DEP=$(SRC:.c=.dep)
 
-main.o:main.c
-	$(CC)gcc -c main.c
+all: defaultenv.h $(OBJ) emconfig
 
-command.o:command.c command.h
-	$(CC)gcc -c command.c
+%.o: %.c
+	$(CC)gcc -c $(CFLAGS) $< -o $@
 
-operator_lib.o:operator_lib.c
-	$(CC)gcc -c operator_lib.c
+%.dep: %.c
+	$(CC)gcc -MM $(CFLAGS) $< > $@
 
-operator_machine.o:operator_machine.c
-	$(CC)gcc -c operator_machine.c
-
-operator_app.o:operator_app.c
-	$(CC)gcc -c operator_app.c
+emconfig:$(OBJ)
+	$(CC)gcc -o $@ $(OBJ)
+	$(CC)strip -s $@
 
 defaultenv.h:emconfig.conf
 	echo "#ifndef DEFAULTENV_H" > $@
@@ -27,4 +25,4 @@ defaultenv.h:emconfig.conf
 	echo "\n#endif" >> $@
 
 clean:
-	rm *.o defaultenv.h
+	rm -f *.o defaultenv.h *.dep
