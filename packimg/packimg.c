@@ -5,12 +5,12 @@
 
 #include "packimg.h"
 
-void print_usage(char *cmd)
+static void print_usage(char *cmd)
 {
 	printf("Usage: %s pagesize file@loadaddr [file@loadaddr] ... [file@loadaddr] output\n", cmd);
 }
 
-int main(int argc, char **argv)
+int packimg_main(int argc, char **argv)
 {
 	FILE *fout;
 	struct pack_header *ph;
@@ -124,4 +124,19 @@ int main(int argc, char **argv)
 	free(ph);
 	
 	return 0;
+}
+
+extern int packimg_burn_main(int argc, char **argv);
+extern int unpackimg_main(int argc, char **argv);
+
+int main(int argc, char **argv)
+{
+	if(strcmp(argv[0], "packimg")==0)
+		return packimg_main(argc, argv);
+
+	if(strcmp(argv[0], "packimg_burn")==0)
+		return packimg_burn_main(argc, argv);
+
+	if(strcmp(argv[0], "unpackimg")==0)
+		return unpackimg_main(argc, argv);
 }

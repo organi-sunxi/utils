@@ -10,7 +10,7 @@
 #include <sys/ioctl.h>
 #include <mtd/mtd-user.h>
 
-void print_usage(char *cmd)
+static void print_usage(char *cmd)
 {
 	printf("Usage: %s -d /dev/mtd* [-o offset] [-s size] [-c max_copy] -f file\n", cmd);
 }
@@ -94,7 +94,7 @@ out:
 	}
 }
 
-int main(int argc, char **argv)
+int packimg_burn_main(int argc, char **argv)
 {
 	int dfd, ffd;
 	int c, max_copy = 1;
