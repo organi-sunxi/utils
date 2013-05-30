@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <sysexits.h>
 
 #define DEFAULT_LOAD_ADDR	0x43100000
 
@@ -75,7 +76,7 @@ static int bitmap24to32(unsigned char *data, unsigned char *out)
 	return 4;
 }
 
-struct output_fmt{
+struct run_fmt{
 	int bit;
 	int	uimage;
 	unsigned long loadaddr;
@@ -84,10 +85,11 @@ struct output_fmt{
 	char *infilename;
 	char *outfilename;
 	char *tmpfilename;
+	int rm_src;
 	int (*bitmapto)(unsigned char *, unsigned char *);
 };
 
-static int splash2bmp(struct output_fmt *fmt)
+static int splash2bmp(struct run_fmt *fmt)
 {
 	splash_header splashhd;
 	char buf[1024], data[4], od[4];
@@ -99,18 +101,18 @@ static int splash2bmp(struct output_fmt *fmt)
 	pfin = fopen(fmt->infilename, "r");
 	if(pfin==NULL){
 		printf("file %s open failed\n", fmt->infilename);
-		return -1;
+		return EX_NOINPUT;
 	}
 
 	if(fmt->uimage){
 		printf("not support uImage file\n");
-		return -1;
+		return EX_DATAERR;
 	}
 
 	fread(&splashhd, sizeof(splashhd), 1, pfin);
 	if(splashhd.magic != SPLASH_MAGIC){
 		printf("wrong splash file %s\n", fmt->infilename);
-		return -1;
+		return EX_DATAERR;
 	}
 
 	//write splash data to tmp.gz file
@@ -118,7 +120,7 @@ static int splash2bmp(struct output_fmt *fmt)
 	pfout = fopen(buf, "w");
 	if(pfout==NULL){
 		printf("file %s creat failed\n", buf);
-		return -1;
+		return EX_CANTCREAT;
 	}
 	while(ret=fread(buf, 1, sizeof(buf),  pfin)){
 		fwrite(buf, 1, ret, pfout);
@@ -131,7 +133,7 @@ static int splash2bmp(struct output_fmt *fmt)
 	ret = system(buf);
 	if(ret){
 		printf("decompress error\n");
-		return -1;
+		return EX_CANTCREAT;
 	}
 	else
 		printf("decompress done\n");
@@ -140,13 +142,13 @@ static int splash2bmp(struct output_fmt *fmt)
 	pfin = fopen(fmt->tmpfilename, "r");
 	if(pfin==NULL){
 		printf("file %s open failed\n", fmt->tmpfilename);
-		return -1;
+		return EX_IOERR;
 	}
 
 	pfout = fopen(fmt->outfilename, "w");
 	if(pfout==NULL){
 		printf("file %s creat failed\n", fmt->outfilename);
-		return -1;
+		return EX_CANTCREAT;
 	}
 
 	//initialize bitmap header
@@ -179,23 +181,28 @@ static int splash2bmp(struct output_fmt *fmt)
 			ret = fread(data, byteperpixel, 1, pfin);
 			if(ret <= 0){
 				printf("failed to read\n");
-				goto failed1;
+				fclose(pfout);
+				fclose(pfin);
+				return EX_DATAERR;
 			}
 			ret = fmt->bitmapto(data, od);
 			fwrite(od, ret, 1, pfout);
 		}
 		fseek(pfin, -2*byteperline, SEEK_CUR);
 	}
+
+	if(fmt->rm_src)
+		unlink(fmt->infilename);
 	
-failed1:
 	fclose(pfin);
 	fclose(pfout);
+	unlink(fmt->tmpfilename);
 
 	return 0;
 }
 
 
-static int bmp2splash(struct output_fmt *fmt)
+static int bmp2splash(struct run_fmt *fmt)
 {
 	FILE *pfin, *pfout;
 	char buf[1024], data[4], od[4];
@@ -211,7 +218,7 @@ static int bmp2splash(struct output_fmt *fmt)
 	pfin = fopen(fmt->infilename, "r");
 	if(pfin==NULL){
 		printf("file %s open failed\n", fmt->infilename);
-		return -1;
+		return EX_NOINPUT;
 	}
 
 	fread(&bmpfileheader, sizeof(BITMAPFILEHEADER), 1, pfin);
@@ -219,7 +226,7 @@ static int bmp2splash(struct output_fmt *fmt)
 
 	if(bmpfileheader.hd[0]!='B' || bmpfileheader.hd[1] !='M'){
 		printf("Input file must be bitmap format!\n");
-		return -1;
+		return EX_DATAERR;
 	}
 
 	cx=bmpinfoheader.biWidth;
@@ -230,13 +237,13 @@ static int bmp2splash(struct output_fmt *fmt)
 
 	if(bmpinfoheader.biBitCount != 24){
 		printf("Bitmap file must be 24bit\n");
-		return -1;
+		return EX_DATAERR;
 	}
 
 	pfout = fopen(fmt->outfilename, "w");
 	if(pfout==NULL){
 		printf("Create file %s failed\n", fmt->outfilename);
-		return -1;
+		return EX_CANTCREAT;
 	}
 
 	splashhd.cx = cx;
@@ -251,7 +258,7 @@ static int bmp2splash(struct output_fmt *fmt)
 
 	if(pfout==NULL){
 		printf("Create file %s failed\n", fmt->tmpfilename);
-		return -1;
+		return EX_CANTCREAT;
 	}
 
 	ret = fseek(pfin, (cy-1)*byteperline, SEEK_CUR);
@@ -261,7 +268,9 @@ static int bmp2splash(struct output_fmt *fmt)
 			ret = fread(data, 3, 1, pfin);
 			if(ret <= 0){
 				printf("failed to read\n");
-				goto failed1;
+				fclose(pfout);
+				fclose(pfin);
+				return EX_DATAERR;
 			}
 			ret = fmt->bitmapto(data, od);
 			fwrite(od, ret, 1, pfout);
@@ -269,7 +278,6 @@ static int bmp2splash(struct output_fmt *fmt)
 		fseek(pfin, -2*byteperline, SEEK_CUR);
 	}
 
-failed1:
 	fclose(pfout);
 	fclose(pfin);
 
@@ -281,7 +289,7 @@ failed1:
 
 	if(ret){
 		printf("compress error\n");
-		return -1;
+		return EX_CANTCREAT;
 	}
 	else
 		printf("done\n");
@@ -306,6 +314,10 @@ failed1:
 		system(buf);
 		unlink(fmt->tmpfilename);
 	}
+
+	if(fmt->rm_src)
+		unlink(fmt->infilename);
+
 	return 0;	
 }
 
@@ -319,12 +331,13 @@ static void show_help(char *name)
 	printf("\t-a\t uboot image load address(default 0x%x)\n", DEFAULT_LOAD_ADDR);
 	printf("\t-t\t tmporary file name(default %s)\n", TMPFILE_NAME);
 	printf("\t-r\t revert mode, splash file to 24bit bitmap file\n");
+	printf("\t-d\t delete input file when sucess\n");
 }
 
 int main(int argc, char* argv[])
 {
 	int i, rev=0;
-	struct output_fmt fmt={
+	struct run_fmt fmt={
 		.bit=16,
 		.uimage=0,
 		.loadaddr=DEFAULT_LOAD_ADDR,
@@ -333,19 +346,20 @@ int main(int argc, char* argv[])
 		.x=0,
 		.y=0,
 		.bitmapto=NULL,
+		.rm_src = 0,
 	};
 
 	if(argc < 2){
 		show_help(argv[0]);
-		return -1;
+		return EX_NOINPUT;
 	}
 
-	while((i = getopt(argc, argv, "hx:y:b:o:a:ut:r")) != -1){
+	while((i = getopt(argc, argv, "hx:y:b:o:a:ut:rd")) != -1){
         switch(i)
         {
             case 'h':
 				show_help(argv[0]);
-				return -1;
+				return 0;
             case 'x':
 				fmt.x = strtol(optarg, NULL, 0);
                 break;
@@ -370,6 +384,9 @@ int main(int argc, char* argv[])
 			case 'r':
 				rev = 1;
 				break;
+			case 'd':
+				fmt.rm_src = 1;
+				break;
         }
     }
 
@@ -381,13 +398,13 @@ int main(int argc, char* argv[])
 	if(!fmt.bitmapto){
 		printf("LCD bit only don't support %d\n", fmt.bit);
 		show_help(argv[0]);
-		return -1;
+		return EX_DATAERR;
 	}
 
 	if(argc < optind+1){
 		printf("no input file\n");
 		show_help(argv[0]);
-		return -1;
+		return EX_NOINPUT;
 	}
 
 	fmt.infilename = argv[optind];
@@ -395,7 +412,6 @@ int main(int argc, char* argv[])
 		return splash2bmp(&fmt);
 
 	return bmp2splash(&fmt);
-
 	
 }
 
