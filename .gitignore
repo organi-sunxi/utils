@@ -3,5 +3,5 @@ GTAGS
 GSYMS
 GPATH
 GRTAGS
-
+*.o
 
