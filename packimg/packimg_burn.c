@@ -77,6 +77,7 @@ int packimg_write(int fd, mtd_info_t *mtd, loff_t nand_off, loff_t nand_size,
 
 			moffs += mtd->erasesize;
 			msize -= mtd->erasesize;
+			noffs += mtd->erasesize;
 			nsize -= mtd->erasesize;
 		}
 
@@ -93,6 +94,8 @@ out:
 		return -1;
 	}
 }
+
+#define ROUND(n, size)	((n)+((size)-1))&(~((size)-1))
 
 int packimg_burn_main(int argc, char **argv)
 {
@@ -134,13 +137,14 @@ int packimg_burn_main(int argc, char **argv)
 	assert(have_device && have_file);
 	assert(max_copy > 0);
 	assert((dfd = open(device_name, O_RDWR)) >= 0);
+	assert(ioctl(dfd, MEMGETINFO, &mtd_info) == 0);
 	assert((ffd = open(file_name, O_RDONLY)) >= 0);
 
 	fstat(ffd, &st);
-	assert((buff = malloc(st.st_size)) != NULL);
+	assert((buff = malloc(ROUND(st.st_size, mtd_info.writesize))) != NULL);
 	assert(read(ffd, buff, st.st_size) == st.st_size);
+	memset(buff+st.st_size, 0xff, ROUND(st.st_size, mtd_info.writesize)-st.st_size);
 
-	assert(ioctl(dfd, MEMGETINFO, &mtd_info) == 0);
 	if (offset < 0)
 		offset = 0;
 	assert(offset < mtd_info.size);
@@ -148,7 +152,7 @@ int packimg_burn_main(int argc, char **argv)
 		size = mtd_info.size - offset;
 	assert(size <= mtd_info.size - offset);
 
-	packimg_write(dfd, &mtd_info, offset, size, (uint32_t)buff, st.st_size, max_copy);
+	packimg_write(dfd, &mtd_info, offset, size, (uint32_t)buff, ROUND(st.st_size, mtd_info.writesize), max_copy);
 
 	free(buff);
 	close(ffd);
