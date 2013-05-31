@@ -325,8 +325,8 @@ static int set_lcd_info(struct fb_info *fbinfo)
 	}
 
 	if(run_cmd_quiet(NULL, NULL, "mv %stmp %s &&"
-		"packimg %s pack.img && packimg_burn -d /dev/mtd"PACKIMG_DEVNUM" -c5 -f pack.img",
-		pack.filename,pack.filename,pack.packimg_name_addr)<0)
+		"packimg %s pack.img && packimg_burn -d /dev/mtd%s -c5 -f pack.img",
+		pack.filename,pack.filename,pack.packimg_name_addr, devnum)<0)
 		return -1;
 	
 	SUCESS_OUT();
@@ -436,3 +436,87 @@ out:
 }
 BUILDIN_CMD("set-lcd", em6000_set_lcd, match_em6000);
 
+static void get_splash(int argc, char *argv[])
+{
+	struct fb_info fbinfo;
+	struct unpackimg_out_t pack;
+	const char *devnum = GET_CONF_VALUE(PACKIMG_DEVNUM);
+
+	LOG("%s\n", __FUNCTION__);
+	if (argc < 2) {
+		FAILED_OUT("too few arguments");
+		return;
+	}
+
+	memset(&pack, 0, sizeof(pack));
+	pack.loadaddr = find_packaddr_by_name("splash");
+
+	chdir(GET_CONF_VALUE(TMPFILE_PATH));
+	//unpack head
+	if (run_cmd_quiet((out_callback_fun)unpackimg_out_cbk, &pack, 
+		"unpackimg -d /dev/blockrom%s", devnum) < 0) {
+		return;
+	}
+
+	if(pack.filename[0]==0){
+		FAILED_OUT("can't find splash");
+		return;
+	}
+
+	//we get splash.bin file at chdir now
+	if(get_fb_info(&fbinfo)<0)
+		return;
+
+	if(run_cmd_quiet(NULL, NULL, "mksplash -t tmpfile -rd -b%d -o %s %s", 
+		fbinfo.bpp, argv[1],pack.filename)<0)
+		return;
+
+	SUCESS_OUT();
+}
+BUILDIN_CMD("get-splash", get_splash, match_em6000);
+
+static void set_splash(int argc, char *argv[])
+{
+	struct unpackimg_out_t pack;
+	const char *devnum = GET_CONF_VALUE(PACKIMG_DEVNUM);
+	struct fb_info fbinfo;
+
+	int ret;
+	unsigned long size;
+
+	LOG("%s\n", __FUNCTION__);
+	if (argc < 2) {
+		FAILED_OUT("too few arguments");
+		return;
+	}
+
+	if(get_fb_info(&fbinfo)<0)
+		return;
+
+	memset(&pack, 0, sizeof(pack));
+	pack.loadaddr = find_packaddr_by_name("splash");
+
+	chdir(GET_CONF_VALUE(TMPFILE_PATH));
+	//unpack head
+	if (run_cmd_quiet((out_callback_fun)unpackimg_out_cbk, &pack, 
+		"unpackimg -d /dev/blockrom%s", devnum) < 0) {
+		return;
+	}
+
+	if(pack.filename[0]==0){
+		LOG("can't find splash");
+		strcpy(pack.filename, "splash.bin");
+	}
+
+	if(run_cmd_quiet(NULL, NULL, "mksplash -t tmpfile -d -b%d -o %s %s", 
+		fbinfo.bpp, pack.filename, argv[1])<0)
+		return;
+
+	if(run_cmd_quiet(NULL, NULL, "packimg %s pack.img && "
+		"packimg_burn -d /dev/mtd%s -c5 -f pack.img",
+		pack.packimg_name_addr, devnum)<0)
+		return;
+	
+	SUCESS_OUT();
+}
+BUILDIN_CMD("set-splash", set_splash, match_em6000);
