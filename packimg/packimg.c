@@ -2,12 +2,20 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <getopt.h>
+#include <assert.h>
+
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <mtd/mtd-user.h>
 
 #include "packimg.h"
 
 static void print_usage(char *cmd)
 {
-	printf("Usage: %s pagesize file@loadaddr [file@loadaddr] ... [file@loadaddr] output\n", cmd);
+	printf("Usage: %s [option] file@loadaddr [file@loadaddr] ... [file@loadaddr] output\n",
+		"\t\t-p <pagesize>",
+		"\t\t-d <mtd device> default /dev/mtd0", cmd);
 }
 
 int packimg_main(int argc, char **argv)
@@ -15,22 +23,48 @@ int packimg_main(int argc, char **argv)
 	FILE *fout;
 	struct pack_header *ph;
 	struct pack_entry *pe;
-	int header_size, nentry, offset, pagesize;
-	char **buffer, *end;
+	int header_size, nentry, offset, pagesize=0;
+	char **buffer, *end, *dev_name="/dev/mtd0";
+	mtd_info_t mtd_info;
 	int i;
 
-	if (argc < 4) {
+	while ((i = getopt(argc, argv, "hd:p:")) != -1) {
+		switch(i) {
+		case 'd':
+			dev_name = optarg;
+			break;
+		case 'p':
+			pagesize = strtol(optarg, &end, 0);
+			if (end == optarg) {
+				fprintf(stderr, "pagesize invalid %s\n", optarg);
+				return -1;
+			}
+			break;
+		case 'h':
+		default:
+			print_usage(argv[0]);
+			return 0;
+		}
+	}
+
+	if (argc < optind+2) {
 		print_usage(argv[0]);
 		return 0;
 	}
 
-	pagesize = strtol(argv[1], &end, 0);
-	if (end == argv[1]) {
-		fprintf(stderr, "pagesize invalid %s\n", argv[1]);
-		return -1;
+	if(pagesize==0){
+		//try to get mtd pagesize
+		assert((i = open(dev_name, O_RDONLY)) >= 0);
+		assert(ioctl(i, MEMGETINFO, &mtd_info) == 0);
+		close(i);
+
+		pagesize = mtd_info.writesize;
+		printf("pagesize is 0x%x\n", pagesize);
 	}
 
-	nentry = argc - 3;
+	assert(pagesize!=0);
+
+	nentry = argc - optind - 1;
 	header_size = sizeof(struct pack_header) + nentry * sizeof(struct pack_entry);
 	offset = (header_size + pagesize - 1) & ~(pagesize - 1);
 	ph = malloc(header_size);
@@ -51,14 +85,14 @@ int packimg_main(int argc, char **argv)
 		FILE *fin;
 		int j;
 		char *filename, *loadaddr, *name;
-		char *at = strchr(argv[i + 2], '@');
+		char *at = strchr(argv[i + optind], '@');
 		if (at == NULL) {
-			fprintf(stderr, "invalid input %s\n", argv[i + 2]);
+			fprintf(stderr, "invalid input %s\n", argv[i + optind]);
 			return -1;
 		}
 		*at = '\0';
 
-		filename = argv[i + 2];
+		filename = argv[i + optind];
 		loadaddr = at + 1;
 		fin = fopen(filename, "rb");
 		if (fin == NULL) {
@@ -131,12 +165,21 @@ extern int unpackimg_main(int argc, char **argv);
 
 int main(int argc, char **argv)
 {
-	if(strcmp(argv[0], "packimg")==0)
+	int len = strlen(argv[0]), ret;
+	char *p = argv[0]+len;
+	for(;len>0;len--, p--){
+		if(*p == '/'){
+			p++;
+			break;
+		}
+ 	}
+ 
+	if(strcmp(p, "packimg")==0)
 		return packimg_main(argc, argv);
 
-	if(strcmp(argv[0], "packimg_burn")==0)
+	if(strcmp(p, "packimg_burn")==0)
 		return packimg_burn_main(argc, argv);
 
-	if(strcmp(argv[0], "unpackimg")==0)
+	if(strcmp(p, "unpackimg")==0)
 		return unpackimg_main(argc, argv);
 }

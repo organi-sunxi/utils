@@ -14,8 +14,8 @@ all: $(OBJ) packimg
 packimg:$(OBJ)
 	$(CROSS_COMPILE)gcc -o $@ $(OBJ)
 	$(CROSS_COMPILE)strip -s $@
-	ln -s packimg unpackimg
-	ln -s packimg packimg_burn
+	rm -f unpackimg && ln -s packimg unpackimg
+	rm -f packimg_burn && ln -s packimg packimg_burn
 
 clean:
 	rm -rf packimg unpackimg packimg_burn *.o
