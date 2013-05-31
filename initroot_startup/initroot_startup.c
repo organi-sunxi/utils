@@ -132,8 +132,8 @@ static void SetQtEnv()
 	FILE *pfile;
 	char buffer[100];
 	const char *rot="";
-	
-	pfile = fopen("/data/config", "r");
+
+	pfile = fopen("/etc/config", "r");
 	if(pfile){
 		while(fgets(buffer, sizeof(buffer), pfile)){
 			remove_space(buffer, sizeof(buffer));
@@ -158,11 +158,11 @@ static void SetQtEnv()
 //	setenv("BACK_DOOR", "This library can work without decrypt device", 1);
 
 	//for tslib
-	setenv("TSLIB_CALIBFILE", "/data/etc/pointercal", 1);
-	setenv("POINTERCAL_FILE", "/data/etc/pointercal", 1);
-	setenv("TSLIB_CONFFILE", "/data/etc/ts.conf", 1);
-	setenv("TSLIB_TSDEVICE", "/dev/event0", 1);
-	setenv("QWS_MOUSE_PROTO", "Tslib:/dev/event0", 1);
+	setenv("TSLIB_CALIBFILE", "/etc/pointercal", 1);
+	setenv("POINTERCAL_FILE", "/etc/pointercal", 1);
+	setenv("TSLIB_CONFFILE", "/etc/ts.conf", 1);
+	setenv("TSLIB_TSDEVICE", "/dev/event1", 1);
+	setenv("QWS_MOUSE_PROTO", "Tslib:/dev/event1", 1);
 }
 
 static char *qt_argv[]={"run","-qws", "-style", "clearlook", NULL};
