@@ -21,6 +21,7 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <sys/mount.h>
+#include <sys/wait.h>
 #include <linux/fb.h>
 #include <linux/sched.h>
 #include "initroot_startup.h"
@@ -28,11 +29,6 @@
 #define FBDEV		"/dev/fb0"
 #define FB_DPI		96
 
-static const int signums[] = { SIGHUP, SIGINT, SIGQUIT, SIGILL, SIGABRT, SIGFPE,
-		SIGSEGV, SIGTERM, SIGBUS };
-#define NUMBER_OF_SIGNAL	sizeof(signums)/sizeof(int)
-
-static  __sighandler_t oldHandlers[NUMBER_OF_SIGNAL];
 static int oldroot;
 
 static void vfsmount()
@@ -65,29 +61,6 @@ static void end(void)
 {
 	printf("app exit handler\n");
 	vfsumount();
-}
-
-static void handleSignal(int signum)
-{
-	printf("app signal %d\n", signum);
-
-	signal(signum, oldHandlers[signum]);
-	end();
-	raise(signum);
-}
-
-static void register_exit_signal()
-{
-	int i;
-
-	for (i = 0; i < NUMBER_OF_SIGNAL; i++) {
-		const int signum = signums[i];
-		__sighandler_t old = signal(signum, handleSignal);
-		if (old == SIG_IGN) // don't remove shm and semaphores when ignored
-			signal(signum, old);
-		else
-			oldHandlers[signum] = (old == SIG_ERR ? SIG_DFL : old);
-	}
 }
 
 static int cal_wh(int *mmW, int *mmH )
@@ -193,6 +166,7 @@ static void SetQtEnv()
 }
 
 static char *qt_argv[]={"run","-qws", "-style", "clearlook", NULL};
+
 int startup_begin(int *argc, char ***argv)
 {
 
@@ -204,7 +178,6 @@ int startup_begin(int *argc, char ***argv)
 	//vfs mount
 	vfsmount();
 	mkInitNodes();
-	register_exit_signal();
 	
 	SetQtEnv();
 
@@ -213,6 +186,8 @@ int startup_begin(int *argc, char ***argv)
 
 int startup_end(startup_child_func pf)
 {
+	int ret;
+
 	if (atexit(end) != 0)
 		printf("can't register end handler\n");
 	
@@ -223,6 +198,9 @@ int startup_end(startup_child_func pf)
 		return 0;
 
 	printf("qt show\n");
-	return pf();
+	ret = pf();
+	end();
+
+	return ret;
 }
 
