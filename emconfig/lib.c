@@ -38,12 +38,11 @@ int get_fb_info(struct fb_info *fbinfo)
 
 	//ps to kHZ
 	fbinfo->pclk = 1000000000/fb_vinfo.pixclock;
-	fbinfo->hfp = fb_vinfo.left_margin;
-	fbinfo->hbp = fb_vinfo.right_margin;
+	fbinfo->hbp = fb_vinfo.left_margin;
+	fbinfo->hfp = fb_vinfo.right_margin;
 	fbinfo->hsw = fb_vinfo.hsync_len;
-	fbinfo->hbp = fb_vinfo.right_margin;
-	fbinfo->vfp = fb_vinfo.upper_margin;
-	fbinfo->vbp = fb_vinfo.lower_margin;
+	fbinfo->vbp = fb_vinfo.upper_margin;
+	fbinfo->vfp = fb_vinfo.lower_margin;
 	fbinfo->vsw = fb_vinfo.vsync_len;
 
 	close(fb);
@@ -188,7 +187,9 @@ int run_cmd_quiet(out_callback_fun fn, void *fg, const char * format,...)
 	va_start(arg_ptr, format);
 	vsnprintf(cmd, sizeof(cmd), format, arg_ptr);
 	va_end(arg_ptr);
-	
+
+	//printf("##run##%s\n",cmd);
+
 	fp = popen(cmd, "r");
 	if(fp == NULL){
 		FAILED_OUT("run %s", cmd);

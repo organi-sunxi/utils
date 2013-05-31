@@ -49,4 +49,6 @@ int run_cmd_quiet(out_callback_fun fn, void *fg, const char * format, ...);
 #define PROGRESS_OUT_HELPER(p, fmt, ...)	printf("progress %d%%["fmt"]\n", p, __VA_ARGS__)
 #define PROGRESS_OUT(p,...)	PROGRESS_OUT_HELPER(p, __VA_ARGS__, 0)
 
+#define ARRAY_SIZE(a)	(sizeof(a)/sizeof(*(a)))
+
 #endif

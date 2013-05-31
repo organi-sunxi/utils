@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <getopt.h>
 
 #include <linux/fb.h>
@@ -80,6 +81,9 @@ static int em6000_load_lcds(int *nlcd, struct local_lcd_info *lcdinfo, struct fb
 			FAILED_OUT("get framebuffer info");
 			return;
 		}
+		//need it, hbp = hbp+hsw
+	//	fbinfo->hbp -= fbinfo->hsw;
+	//	fbinfo->vbp -= fbinfo->vsw;
 	}
 
 	pf = fopen(LCD_LIST_FILE, "r");
@@ -215,9 +219,118 @@ static void em6000_list_lcd(int argc, char *argv[])
 }
 BUILDIN_CMD("list-lcd", em6000_list_lcd, match_em6000);
 
+#define MAX_PACK		5
+#define MAX_PACK_NAME	32
+
+struct unpackimg_out_t{
+	char filename[MAX_PACK_NAME];
+	unsigned int loadaddr;
+	char packimg_name_addr[MAX_STRING];
+};
+
+struct packimg_name_map{
+	const unsigned int loadaddr;
+	const char name[MAX_PACK_NAME];
+};
+
+static const struct packimg_name_map packname_map[]={
+	{0x43100000, "splash"},
+	{0x43000000, "script"},
+	{0x44000000, "fdt"},
+};
+
+static unsigned int find_packaddr_by_name(const char *name)
+{
+	int i;
+	for(i=0;i<ARRAY_SIZE(packname_map);i++){
+		if(strncmp(name, packname_map[i].name,MAX_PACK_NAME)==0)
+			return packname_map[i].loadaddr;
+	}
+
+	return 0;
+}
+
+static int unpackimg_out_cbk(struct unpackimg_out_t *pack, char out[], int n)
+{
+	unsigned int addr=0;
+	char filename[MAX_PACK_NAME];
+	int ret;
+
+	ret = sscanf(out, "%[^@]@%x", filename, &addr);
+	if(ret<2)
+		return 0;
+
+	ret = strlen(pack->packimg_name_addr);
+	snprintf(pack->packimg_name_addr+ret, MAX_STRING-ret, 
+		" %s@0x%x", filename, addr);
+	
+	if(pack->loadaddr!=addr)
+		return 0;
+
+	//find load addr
+	strncpy(pack->filename, filename, sizeof(filename));
+
+	return 0;
+}
+
+#define AWK_INI_FILE_BEGIN(sec)	"awk -F \'=\' \'/^\\[/{a=0}/\\["sec"\\]/{a=1}a==1{"
+#define AWK_INI_FILE_KEY(key)	"if($1==\""key"\")print $1\"=%d\";else "
+#define AWK_INI_FILE_END()	"print $0;next;}{print $0}\'"
+
 static int set_lcd_info(struct fb_info *fbinfo)
 {
+	struct unpackimg_out_t pack;
+	const char *devnum = GET_CONF_VALUE(PACKIMG_DEVNUM);
+	unsigned int ht, vt;
 
+	memset(&pack, 0, sizeof(pack));
+	pack.loadaddr = find_packaddr_by_name("script");
+
+	chdir(GET_CONF_VALUE(TMPFILE_PATH));
+	//unpack head
+	if (run_cmd_quiet((out_callback_fun)unpackimg_out_cbk, &pack, 
+		"unpackimg -d /dev/blockrom%s", devnum) < 0) {
+		return -1;
+	}
+
+	if(pack.filename[0]==0){
+		FAILED_OUT("can't find script");
+		return -1;
+	}
+
+	ht = fbinfo->hfp + fbinfo->hbp + fbinfo->width + fbinfo->hsw;
+	vt = fbinfo->vfp + fbinfo->vbp + fbinfo->height + fbinfo->vsw;;
+	printf("%d,%d,%d\n", fbinfo->vfp ,fbinfo->vbp ,fbinfo->height);
+	vt <<=1;
+
+	if(run_cmd_quiet(NULL, NULL, "bin2fex %s|sed -e \'s/[[:space:]]*//g\'|"
+		AWK_INI_FILE_BEGIN("lcd0_para")
+		AWK_INI_FILE_KEY("lcd_x")
+		AWK_INI_FILE_KEY("lcd_y")
+		AWK_INI_FILE_KEY("lcd_dclk_freq")
+		AWK_INI_FILE_KEY("lcd_hbp")
+		AWK_INI_FILE_KEY("lcd_ht")
+		AWK_INI_FILE_KEY("lcd_vbp")
+		AWK_INI_FILE_KEY("lcd_vt")
+		AWK_INI_FILE_KEY("lcd_hv_hspw")
+		AWK_INI_FILE_KEY("lcd_hv_vspw")
+		AWK_INI_FILE_END()
+		"|fex2bin > %stmp",
+		pack.filename, 
+		fbinfo->width, fbinfo->height, (fbinfo->pclk+500)/1000, 
+		fbinfo->hbp+fbinfo->hsw, ht, 
+		fbinfo->vbp+fbinfo->vsw, vt, fbinfo->hsw, fbinfo->vsw,
+		pack.filename)<0){
+		return -1;
+	}
+
+	if(run_cmd_quiet(NULL, NULL, "mv %stmp %s &&"
+		"packimg %s pack.img && packimg_burn -d /dev/mtd"PACKIMG_DEVNUM" -c5 -f pack.img",
+		pack.filename,pack.filename,pack.packimg_name_addr)<0)
+		return -1;
+	
+	SUCESS_OUT();
+	return 0;	
 }
 
 static void em6000_set_lcd(int argc, char *argv[])
@@ -229,7 +342,7 @@ static void em6000_set_lcd(int argc, char *argv[])
 		LCDMODE_RM,
 	}mode = LCDMODE_SET;
 
-	struct local_lcd_info *plcdinfo=malloc(MAX_LCD_LIST*sizeof(struct local_lcd_info));
+	struct local_lcd_info *plcdinfo;
 	struct fb_info fbinfo;
 	char *lcdname, *lcdparam, cmd[MAX_STRING];
 	int nlcd, i, match;
@@ -261,17 +374,18 @@ static void em6000_set_lcd(int argc, char *argv[])
 		}
 	}
 
+	plcdinfo=malloc(MAX_LCD_LIST*sizeof(struct local_lcd_info));
+	nlcd=MAX_LCD_LIST;
 	match = em6000_load_lcds(&nlcd, plcdinfo, &fbinfo);
 
 	if(mode == LCDMODE_SETINDEX){
-		if(match!=i){
-			if(i>=nlcd){
-				FAILED_OUT("out of lcd list range");
-				goto out;
-			}
-			if(set_lcd_info(&plcdinfo[i].info)<0)
-				goto out;
+		if(i>=nlcd){
+			FAILED_OUT("out of lcd list range");
+			goto out;
 		}
+		
+		if(set_lcd_info(&plcdinfo[i].info)<0)
+			goto out;
 		SUCESS_OUT();
 		goto out;
 	}
@@ -290,9 +404,10 @@ static void em6000_set_lcd(int argc, char *argv[])
 		}
 
 		if(run_cmd_quiet(NULL, NULL, 
-			"sed -e 's/^[[:space:]]*//g' "LCD_LIST_FILE" | grep \'^\\<%s\\>\'>/dev/null && \\"
-			"sed -i -e 's/^[[:space:]]*//g;s/^\\<%s\\>.*$/%s/g' "LCD_LIST_FILE" || \\"
-			"echo %s >> "LCD_LIST_FILE, lcdname, lcdname, lcdparam, lcdparam)<0)
+			"sed -e 's/^[[:space:]]*//g' "LCD_LIST_FILE" | grep '^\\<%s\\>'>/dev/null && "
+			"sed -i -e 's/^[[:space:]]*//g;s/^\\<%s\\>.*$/%s %s/g' "LCD_LIST_FILE" || "
+			"echo \"%s %s\" >> "LCD_LIST_FILE, 
+			lcdname, lcdname, lcdname, lcdparam, lcdname, lcdparam)<0)
 			goto out;
 
 		if(mode == LCDMODE_SETCUR){
@@ -310,7 +425,7 @@ static void em6000_set_lcd(int argc, char *argv[])
 			goto out;
 		}
 		if(run_cmd_quiet(NULL, NULL, 
-			"sed -i -e \'s/^[[:space:]]*//g;/^<\\%s\\>/d\' "LCD_LIST_FILE, lcdname)<0)
+			"sed -i -e 's/^[[:space:]]*//g;/^\\<%s\\>.*$/d' "LCD_LIST_FILE, lcdname)<0)
 			goto out;
 
 		SUCESS_OUT();
