@@ -13,9 +13,9 @@
 
 static void print_usage(char *cmd)
 {
-	printf("Usage: %s [option] file@loadaddr [file@loadaddr] ... [file@loadaddr] output\n",
-		"\t\t-p <pagesize>",
-		"\t\t-d <mtd device> default /dev/mtd0", cmd);
+	printf("Usage: %s [option] file@loadaddr [file@loadaddr] ... [file@loadaddr] output\n"
+		"\t\t-p <pagesize>\n"
+		"\t\t-d <mtd device> default /dev/mtd0\n", cmd);
 }
 
 int packimg_main(int argc, char **argv)
