@@ -9,7 +9,7 @@
 #include "logmessage.h"
 
 #define MAX_COMMAND 256
-#define DEFAULT_CONFIG_FILE	"/data/etc/emconfig.conf"
+#define DEFAULT_CONFIG_FILE	"/etc/emconfig.conf"
 
 
 FILE *plogfile=NULL;
@@ -91,9 +91,6 @@ int main(int argc, char *argv[])
 
 	setvbuf(stdout, NULL, _IONBF, 0);
 
-	//set configure file into envirment
-	set_env(conf_filename);
-
 	while((next_option=getopt(argc,argv,short_options))!=-1){
 		switch(next_option){ 
 		case 'h':
@@ -113,6 +110,9 @@ int main(int argc, char *argv[])
 			print_usage (argv[0],1); 
 		}
 	} 
+
+	//set configure file into envirment
+	set_env(conf_filename);
 
 	for (;;) {
 		printf(">");
