@@ -22,17 +22,27 @@
  * lzo_wrapper.c
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "lz4/lz4.h"
+#include "lz4/lz4hc.h"
 
 #include "squashfs_fs.h"
 #include "compressor.h"
 
+static int (*lz4_comp)(const char* , char* , int) = LZ4_compress;
+
 static int squashfs_lz4_options(char *argv[], int argc)
 {
-	return 0;
+	if(argc>=1 && strcmp(argv[0], "-Xhc")==0){
+		printf("use lz4 hc mode\n");
+		lz4_comp = LZ4_compressHC;
+		return 0;
+	}
+
+	return -1;
 }
 
 static int squashfs_lz4_init(void **strm, int block_size, int flags)
@@ -46,7 +56,7 @@ static int squashfs_lz4_compress(void *strm, void *d, void *s, int size, int blo
 {
 	unsigned int outlen;
 
-	outlen = LZ4_compress(s, d, size);
+	outlen = lz4_comp(s, d, size);
 	if(outlen <= 0)
 		goto failed;
 	if(outlen >= size)
