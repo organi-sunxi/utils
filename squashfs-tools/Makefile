@@ -17,6 +17,17 @@
 #
 GZIP_SUPPORT = 1
 
+########### Building LZ4 support #############
+#
+# LZ4 compression.
+#
+# LZ4 (http://lz4.googlecode.com/svn/trunk) is supported
+#
+# To build using LZ4 - install the library and uncomment
+# the LZ4_SUPPORT line below.
+#
+LZ4_SUPPORT = 1
+
 ########### Building XZ support #############
 #
 # LZMA2 compression.
@@ -115,6 +126,13 @@ LIBS += -lz
 COMPRESSORS += gzip
 endif
 
+ifeq ($(LZ4_SUPPORT),1)
+CFLAGS += -DLZ4_SUPPORT
+MKSQUASHFS_OBJS += lz4_wrapper.o lz4/lz4.o lz4/lz4hc.o
+UNSQUASHFS_OBJS += lz4_wrapper.o lz4/lz4.o lz4/lz4hc.o
+COMPRESSORS += lz4
+endif
+
 ifeq ($(LZMA_SUPPORT),1)
 LZMA_OBJS = $(LZMA_DIR)/C/Alloc.o $(LZMA_DIR)/C/LzFind.o \
 	$(LZMA_DIR)/C/LzmaDec.o $(LZMA_DIR)/C/LzmaEnc.o $(LZMA_DIR)/C/LzmaLib.o
@@ -200,6 +218,8 @@ all: mksquashfs unsquashfs
 
 mksquashfs: $(MKSQUASHFS_OBJS)
 	$(CC) $(LDFLAGS) $(EXTRA_LDFLAGS) $(MKSQUASHFS_OBJS) $(LIBS) -o $@
+lz4:
+	$(MAKE) -C lz4
 
 mksquashfs.o: mksquashfs.c squashfs_fs.h mksquashfs.h sort.h squashfs_swap.h \
 	xattr.h pseudo.h compressor.h
@@ -220,6 +240,8 @@ xattr.o: xattr.c xattr.h squashfs_fs.h squashfs_swap.h mksquashfs.h
 read_xattrs.o: read_xattrs.c xattr.h squashfs_fs.h squashfs_swap.h read_fs.h
 
 gzip_wrapper.o: gzip_wrapper.c compressor.h squashfs_fs.h
+
+lz4_wrapper.o: lz4_wrapper.c compressor.h squashfs_fs.h lz4
 
 lzma_wrapper.o: lzma_wrapper.c compressor.h squashfs_fs.h
 
@@ -249,7 +271,7 @@ unsquashfs_xattr.o: unsquashfs_xattr.c unsquashfs.h squashfs_fs.h xattr.h
 
 .PHONY: clean
 clean:
-	-rm -f *.o mksquashfs unsquashfs
+	-rm -f *.o mksquashfs unsquashfs lz4/*.o
 
 .PHONY: install
 install: mksquashfs unsquashfs
