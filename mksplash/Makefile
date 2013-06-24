@@ -1,10 +1,10 @@
-CC=gcc
-LDFLAG=
+CFLAGS=
 
 all: mksplash
 
-mksplash: 
-	$(CC) mksplash.c $(LDFLAG) -o mksplash $(EXTRA_LIBS)
+mksplash:mksplash.c 
+	$(CROSS)gcc mksplash.c $(CFLAGS) -o mksplash $(EXTRA_LIBS)
+	$(CROSS)strip -s mksplash
 
 clean:
 	rm -f *.o mksplash

@@ -1,16 +1,22 @@
 #!makefile
 
-CROSS_COMPILE ?= arm-linux-gnueabi-
+CROSS_COMPILE ?=
+CFLAGS=
 
-all: packimg packimg_burn
+SRC=packimg_burn.c packimg.c unpackimg.c
+OBJ=$(SRC:.c=.o)
 
-packimg: packimg.c
-	gcc -g $< -o $@
+all: $(OBJ) packimg
 
-packimg_burn: packimg_burn.c
-	$(CROSS_COMPILE)gcc -g $< -o $@
+%.o: %.c
+	$(CROSS_COMPILE)gcc -c $(CFLAGS) $< -o $@
+
+packimg:$(OBJ)
+	$(CROSS_COMPILE)gcc -o $@ $(OBJ)
+	$(CROSS_COMPILE)strip -s $@
+	ln -s packimg unpackimg
+	ln -s packimg packimg_burn
 
 clean:
-	rm -rf packimg packimg_burn
-
+	rm -rf packimg unpackimg packimg_burn *.o
 

@@ -3,29 +3,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PACK_MAGIC 0x4b434150
-#define PACK_NAME_MAX 32
+#include "packimg.h"
 
-struct pack_header {
-	uint32_t magic;
-	uint32_t nentry;
-	uint32_t crc;
-};
-
-struct pack_entry {
-	uint32_t offset;
-	uint32_t size;
-	uint32_t ldaddr;
-	uint32_t crc;
-	char name[PACK_NAME_MAX];
-};
-
-void print_usage(char *cmd)
+static void print_usage(char *cmd)
 {
 	printf("Usage: %s pagesize file@loadaddr [file@loadaddr] ... [file@loadaddr] output\n", cmd);
 }
 
-int main(int argc, char **argv)
+int packimg_main(int argc, char **argv)
 {
 	FILE *fout;
 	struct pack_header *ph;
@@ -39,7 +24,7 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	pagesize = strtol(argv[1], &end, 16);
+	pagesize = strtol(argv[1], &end, 0);
 	if (end == argv[1]) {
 		fprintf(stderr, "pagesize invalid %s\n", argv[1]);
 		return -1;
@@ -131,8 +116,27 @@ int main(int argc, char **argv)
 	for (i = 0; i < nentry; i++) {
 		fseek(fout, pe[i].offset, SEEK_SET);
 		fwrite(buffer[i], pe[i].size, 1, fout);
+		free(buffer[i]);
 	}
 	fclose(fout);
 
+	free(buffer);
+	free(ph);
+	
 	return 0;
+}
+
+extern int packimg_burn_main(int argc, char **argv);
+extern int unpackimg_main(int argc, char **argv);
+
+int main(int argc, char **argv)
+{
+	if(strcmp(argv[0], "packimg")==0)
+		return packimg_main(argc, argv);
+
+	if(strcmp(argv[0], "packimg_burn")==0)
+		return packimg_burn_main(argc, argv);
+
+	if(strcmp(argv[0], "unpackimg")==0)
+		return unpackimg_main(argc, argv);
 }
