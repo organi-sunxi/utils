@@ -28,12 +28,10 @@
 #include "capfile.h"
 #include <video/sunxi_disp_ioctl.h>
 
-#define VIN_SYSTEM_NTSC	0
-#define VIN_SYSTEM_PAL	1
-
 #define VIN_ROW_NUM	1
 #define VIN_COL_NUM	1
-#define VIN_SYSTEM	VIN_SYSTEM_PAL
+
+static int VIN_SYSTEM;
 
 //#define LOGTIME
 
@@ -845,7 +843,7 @@ int video_stop(void)
 	return 0;
 }
 
-int video_init(FILE *log, FILE *cap, char *dir)
+int video_init(FILE *log, FILE *cap, int camera_mode, char *dir)
 {
 	logfile = log;
 	if(cap){
@@ -854,6 +852,7 @@ int video_init(FILE *log, FILE *cap, char *dir)
 		fseek(cap, sizeof(video_hd), SEEK_SET);
 	}
 
+	VIN_SYSTEM = camera_mode;
 	save_dir = dir;
 
 	video_thd.video_running = 0;

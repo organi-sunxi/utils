@@ -30,19 +30,25 @@
 #include "imu.h"
 #include "video.h"
 
+#define VIN_SYSTEM_NTSC	0
+#define VIN_SYSTEM_PAL	1
+
 static void print_usage(char* name)
 {
 	printf("Usage: %s [optional] <capture file>\n", name);
 	printf("\t-h \t show this help\n");
+	printf("\t-n \t camera NTSC input\n");
+	printf("\t-p \t camera PAL input\n");
 	printf("\t-e n\t video capture every n frame\n");
 	printf("\t-m n\t Max video file size(MByte)\n");
+	printf("\t-s dir\t capture image save directory\n");
 }
 
 int main(int argc, char** argv)
 {
 	char vfname[128], ifname[128], *p=vfname, picture_dir[128], *picture_save = NULL;
 	FILE *vfile=NULL, *ifile=NULL;
-	int c;
+	int c, camera_mode = VIN_SYSTEM_PAL;
 	unsigned int e=1, m=0;
 
 	Video_st2 vst={
@@ -67,7 +73,7 @@ int main(int argc, char** argv)
 	}
 
 
-	while(( c = getopt(argc, argv, "he:m:s:"))!= -1){
+	while(( c = getopt(argc, argv, "hnpe:m:s:"))!= -1){
 		switch(c){
 		case 'e':
 			e = strtol(optarg, NULL, 0);
@@ -78,6 +84,16 @@ int main(int argc, char** argv)
 		case 's':
 			strncpy(picture_dir, optarg, 128);
 			picture_save = picture_dir;
+			break;
+		case 'p':
+			camera_mode = VIN_SYSTEM_PAL;
+			vst.crop_rect.width = 720;
+			vst.crop_rect.height = 576;
+			break;
+		case 'n':
+			camera_mode = VIN_SYSTEM_NTSC;
+			vst.crop_rect.width = 720;
+			vst.crop_rect.height = 480;
 			break;
 		case 'h':
 		default:
@@ -102,7 +118,7 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	video_init(stderr, vfile, picture_save);
+	video_init(stderr, vfile, camera_mode, picture_save);
 	imu_init(stderr, ifile);
 	video_start(&vst,e,m);
 	imu_start();
