@@ -11,6 +11,9 @@ LINUX_CROSS_COMPILE=arm-linux-gnueabihf-
 UBOOTDIR=$TOPDIR/sunxi-uboot
 LINUXDIR=$TOPDIR/linux-a10
 ROOTFSDIR=$TOPDIR/em6000-root
+TOOLSDIR=$TOPDIR/utils
+
+SPLASH_FILE=$TOPDIR/simit-320x240-24bit.bmp
 
 declare -a BLOCK_SIZE
 declare -a SPL_SIZE
@@ -71,6 +74,22 @@ mkdir -p $MOUNTDIR
 fi
 
 ###################################################################
+# tools
+cd $TOOLSDIR
+
+# mksplash
+cd mksplash
+make
+
+# splash.bin
+./mksplash $SPLASH_FILE
+cp splash.bin $MOUNTDIR
+
+# packimg
+cd ../packimg
+make
+
+###################################################################
 # build uboot
 cd $UBOOTDIR
 
@@ -84,8 +103,8 @@ sudo dd if=./u-boot.bin of=$TARGET bs=1024 seek=32
 fi
 
 # NAND uboot
-make CROSS_COMPILE=$UBOOT_CROSS_COMPILE distclean
-make CROSS_COMPILE=$UBOOT_CROSS_COMPILE EM6000
+#make CROSS_COMPILE=$UBOOT_CROSS_COMPILE distclean
+#make CROSS_COMPILE=$UBOOT_CROSS_COMPILE EM6000
 
 # sunxi-spl.bin & u-boot.bin
 cp spl/sunxi-spl.bin $MOUNTDIR
@@ -101,11 +120,17 @@ cp em6000.env $MOUNTDIR
 cd $LINUXDIR
 
 # uImage
-make ARCH=arm em6000_fast_defconfig
-make ARCH=arm CROSS_COMPILE=$LINUX_CROSS_COMPILE uImage LOADADDR=0x48000000
+#make ARCH=arm em6000_fast_defconfig
+#make ARCH=arm CROSS_COMPILE=$LINUX_CROSS_COMPILE uImage LOADADDR=0x48000000
 cp arch/arm/boot/uImage $MOUNTDIR
 
-# FDT
+# script.bin
+cd sunxi-board
+./fex2bin ecohmi.fex script.bin
+cp script.bin $MOUNTDIR
+cd ..
+
+# em6000.dtb & pack.img
 for i in ${!CHIPS[*]}
 do
 	CHIP=${CHIPS[$i]}
@@ -118,15 +143,12 @@ do
 	rm -rf arch/arm/boot/dts/$FILENAME.dts
 	mkdir -p $MOUNTDIR/$CHIP
 	cp arch/arm/boot/$FILENAME.dtb $MOUNTDIR/$CHIP/em6000.dtb
+	$TOOLSDIR/packimg/packimg $PSIZE $MOUNTDIR/$CHIP/em6000.dtb@44000000 $MOUNTDIR/script.bin@43000000 $MOUNTDIR/splash.bin@43100000 $MOUNTDIR/$CHIP/pack.img
 done
-
-# script.bin
-cd sunxi-board
-./fex2bin ecohmi.fex script.bin
-cp script.bin $MOUNTDIR
 
 ###################################################################
 # rootfs
+
 
 ###################################################################
 # splash

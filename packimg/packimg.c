@@ -131,12 +131,20 @@ extern int unpackimg_main(int argc, char **argv);
 
 int main(int argc, char **argv)
 {
-	if(strcmp(argv[0], "packimg")==0)
+	char *name;
+
+	name = strrchr(argv[0], '/');
+	if (name == NULL)
+		name = argv[0];
+	else
+		name++;
+
+	if(strcmp(name, "packimg")==0)
 		return packimg_main(argc, argv);
 
-	if(strcmp(argv[0], "packimg_burn")==0)
+	if(strcmp(name, "packimg_burn")==0)
 		return packimg_burn_main(argc, argv);
 
-	if(strcmp(argv[0], "unpackimg")==0)
+	if(strcmp(name, "unpackimg")==0)
 		return unpackimg_main(argc, argv);
 }
