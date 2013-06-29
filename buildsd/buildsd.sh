@@ -148,13 +148,15 @@ done
 
 ###################################################################
 # rootfs
+cd $ROOTFSDIR
 
-
-###################################################################
-# splash
-
-###################################################################
-# tools
+for i in ${!CHIPS[*]}
+do
+	CHIP=${CHIPS[$i]}
+	make clean
+	make TARGET_CHIP=$CHIP
+	cp rootfs.img initfs.img $MOUNTDIR/$CHIP
+done
 
 
 
