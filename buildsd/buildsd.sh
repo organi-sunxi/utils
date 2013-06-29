@@ -3,7 +3,7 @@
 TOPDIR=/home/yuq/projects/a10
 TARGET=/dev/sdf
 MOUNTDIR=/mnt/sddisk
-TARGET_SDCARD=false
+TARGET_SDCARD=true
 UBOOT_CROSS_COMPILE=arm-none-eabi-
 LINUX_CROSS_COMPILE=arm-linux-gnueabihf-
 
@@ -67,6 +67,7 @@ n
 p
 w
 EOF
+sudo mkfs.vfat -I ${TARGET}1
 echo "mount sdcard ${TARGET}1 on $MOUNTDIR"
 sudo mount "${TARGET}1" $MOUNTDIR
 else
