@@ -1,11 +1,14 @@
 #!/bin/bash
 
+######################################################################
+# config
+
 TOPDIR=/home/yuq/projects/a10
 TARGET=/dev/sdf
 MOUNTDIR=/mnt/sddisk
-TARGET_SDCARD=true
 UBOOT_CROSS_COMPILE=arm-none-eabi-
 LINUX_CROSS_COMPILE=arm-linux-gnueabihf-
+BOARD=em6000
 
 UBOOTDIR=$TOPDIR/sunxi-uboot
 LINUXDIR=$TOPDIR/linux-a10
@@ -13,6 +16,59 @@ ROOTFSDIR=$TOPDIR/em6000-root
 TOOLSDIR=$TOPDIR/utils
 
 SPLASH_FILE=$TOPDIR/simit-320x240-24bit.bmp
+
+######################################################################
+# parse parameter
+
+TARGET_SDCARD=false
+TARGET_UBOOT=false
+TARGET_PACKIMG=false
+TARGET_KERNEL=false
+TARGET_ROOTFS=false
+
+while getopts ht: opt
+do
+	case $opt in
+		t)
+			case $OPTARG in
+				sdcard)
+					TARGET_SDCARD=true
+					;;
+				uboot)
+					TARGET_UBOOT=true
+					;;
+				packimg)
+					TARGET_PACKIMG=true
+					;;
+				kernel)
+					TARGET_KERNEL=true
+					;;
+				rootfs)
+					TARGET_ROOTFS=true
+					;;
+				all)
+					TARGET_UBOOT=true
+					TARGET_PACKIMG=true
+					TARGET_KERNEL=true
+					TARGET_ROOTFS=true
+					;;
+				*)
+					echo "Unknown target $OPTARG"
+					;;
+			esac
+			;;
+		h)
+			echo "Usage: $0 [-h] [-t sdcard|uboot|packimg|kernel|rootfs|all]"
+			;;
+		*)
+			echo "Unknown option $opt"
+			exit 1
+			;;
+	esac
+done
+
+######################################################################
+# chip parameter
 
 declare -a BLOCK_SIZE
 declare -a SPL_SIZE
@@ -53,6 +109,9 @@ case "$1" in
 esac
 }
 
+###################################################################
+# SD card partition
+
 # create for TARGET
 if [ "$TARGET_SDCARD" = "true" ]
 then
@@ -71,27 +130,33 @@ sudo mkfs.vfat -I ${TARGET}1
 echo "mount sdcard ${TARGET}1 on $MOUNTDIR"
 sudo mount "${TARGET}1" $MOUNTDIR
 else
-mkdir -p $MOUNTDIR
+sudo mkdir -p $MOUNTDIR
 fi
 
 ###################################################################
 # tools
+
 cd $TOOLSDIR
 
+# tools for packimg
+if [ "$TARGET_PACKIMG" = "true" ]
+then
 # mksplash
 cd mksplash
 make
 
 # splash.bin
-./mksplash $SPLASH_FILE
+./mksplash -b32 $SPLASH_FILE
 sudo cp splash.bin $MOUNTDIR
 
 # packimg
 cd ../packimg
 make
+fi
 
 ###################################################################
 # build uboot
+
 cd $UBOOTDIR
 
 # MMC uboot
@@ -104,6 +169,8 @@ sudo dd if=./u-boot.bin of=$TARGET bs=1024 seek=32
 fi
 
 # NAND uboot
+if [ "$TARGET_UBOOT" = "true" ]
+then
 make CROSS_COMPILE=$UBOOT_CROSS_COMPILE distclean
 make CROSS_COMPILE=$UBOOT_CROSS_COMPILE EM6000
 
@@ -115,19 +182,28 @@ sudo cp u-boot.bin $MOUNTDIR
 cd bootscript
 make
 sudo cp em6000.env $MOUNTDIR
+fi
 
 ###################################################################
 # build linux
+
 cd $LINUXDIR
 
 # uImage
+if [ "$TARGET_KERNEL" = "true" ]
+then
 make ARCH=arm em6000_fast_defconfig
 make ARCH=arm CROSS_COMPILE=$LINUX_CROSS_COMPILE uImage LOADADDR=0x48000000
 sudo cp arch/arm/boot/uImage $MOUNTDIR
+fi
+
+# pack all
+if [ "$TARGET_PACKIMG" = "true" ]
+then
 
 # script.bin
 cd sunxi-board
-./fex2bin ecohmi.fex script.bin
+./fex2bin $BOARD.fex script.bin
 sudo cp script.bin $MOUNTDIR
 cd ..
 
@@ -147,9 +223,15 @@ do
 	sudo $TOOLSDIR/packimg/packimg $PSIZE $MOUNTDIR/$CHIP/em6000.dtb@44000000 $MOUNTDIR/script.bin@43000000 $MOUNTDIR/splash.bin@43100000 $MOUNTDIR/$CHIP/pack.img
 done
 
+fi
+
 ###################################################################
 # rootfs
+
 cd $ROOTFSDIR
+
+if [ "$TARGET_ROOTFS" = "true" ]
+then
 
 for i in ${!CHIPS[*]}
 do
@@ -158,6 +240,8 @@ do
 	make TARGET_CHIP=$CHIP
 	sudo cp rootfs.img initfs.img $MOUNTDIR/$CHIP
 done
+
+fi
 
 
 
