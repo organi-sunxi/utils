@@ -8,6 +8,7 @@
 
 #include <linux/fb.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
 #include "lib.h"
 #include "logmessage.h"
@@ -182,13 +183,14 @@ int run_cmd_quiet(out_callback_fun fn, void *fg, const char * format,...)
 {
 	FILE *fp;
 	int rc;
-	static char cmd[4096];
+	static char cmd[16*1024];
+
 	va_list arg_ptr;
 	va_start(arg_ptr, format);
 	vsnprintf(cmd, sizeof(cmd), format, arg_ptr);
 	va_end(arg_ptr);
 
-	//printf("##run##%s\n",cmd);
+//	printf("##run##%s\n",cmd);
 
 	fp = popen(cmd, "r");
 	if(fp == NULL){

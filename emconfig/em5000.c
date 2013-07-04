@@ -129,34 +129,31 @@ static void set_lcd(int argc, char *argv[])
 {
 	enum lcdinfo_mode{
 		LCDMODE_SET,
-		LCDMODE_SETCUR,
 		LCDMODE_SETINDEX,
-		LCDMODE_RM,
+		LCDMODE_RMALL,
+		LCDMODE_SAVE,
 	}mode = LCDMODE_SET;
 
-	struct lcdinfo lcdinfo[MAX_ARGS];
-	char *setcmd, *lcdname=NULL, *lcdparam=NULL, *p;
-	int buf_size, nlcd, i, mach=0;
-	int next_option;
-	const char*const short_options ="ci:r:";
+	static char cmd_buf[MAX_STRING*50], *p=cmd_buf;
+	
+	int i, next_option;
+	const char*const short_options ="i:rs";
 	
 	LOG("%s\n", __FUNCTION__);
 
 	optind=0;
 	while((next_option =getopt(argc,argv,short_options))!=-1) {
 		switch (next_option){
-		case 'c':
-			mode = LCDMODE_SETCUR;
-			break;
 		case 'i':
 			mode = LCDMODE_SETINDEX;
 			i = strtol(optarg, NULL, 0);
 			break; 
 		case 'r':
-			mode = LCDMODE_RM;
-			lcdname = optarg;
-			lcdparam = "";
-			break; 
+			mode = LCDMODE_RMALL;
+			break;
+		case 's':
+			mode = LCDMODE_SAVE;
+			break;
 		case -1:	//Done with options.
 			break; 
 		default:
@@ -165,71 +162,28 @@ static void set_lcd(int argc, char *argv[])
 		}
 	}
 
-	if(mode == LCDMODE_SETINDEX){
+	switch(mode){
+	case LCDMODE_SETINDEX:
 		if(set_lcd_index(i)==0)
 			SUCESS_OUT();
 		return;
-	}
-
-	if(mode == LCDMODE_SET || mode == LCDMODE_SETCUR){
+	case LCDMODE_RMALL:
+		p = cmd_buf;
+		p += snprintf(p, cmd_buf+sizeof(cmd_buf)-p, "fw_setenv lcdtimings \"");
+		return;
+	case LCDMODE_SET:
 		if(argc < optind+2){
 			FAILED_OUT("too few arguments");
 			return;
 		}
-		lcdname = argv[optind];
-		lcdparam = argv[optind+1];
-	}
 
-	buf_size = parse_all_lcds(&nlcd, lcdinfo);
-	if(buf_size<=0)
+		p += snprintf(p, cmd_buf+sizeof(cmd_buf)-p, "%s %s\n", argv[optind], argv[optind+1]);
 		return;
-
-	buf_size += strlen(lcdname) + strlen(lcdparam) + 10;
-	p = setcmd = (char *)malloc(buf_size);
-	p += sprintf(p, "fw_setenv lcdtimings \"");
-	
-	for (i = 0; i < nlcd; i++){
-		if (strcmp(lcdinfo[i].lcdname, lcdname) == 0 ){
-			mach = 1;
-			if(mode == LCDMODE_RM){
-				int index = get_lcd_index();
-				if(i<index){
-					set_lcd_index(index-1);
-				}
-				continue;
-			}
-
-			p += sprintf(p, "%s %s\n", lcdname, lcdparam);
-			if (mode == LCDMODE_SETCUR){
-				if(set_lcd_index(i)<0)
-					goto failed1;
-			}
-			continue;
-		}
-
-		p += sprintf(p, "%s %s\n", lcdinfo[i].lcdname, lcdinfo[i].lcdparam);
+	case LCDMODE_SAVE:
+		if(run_cmd_quiet(NULL, NULL, "%s\"", cmd_buf)==0)
+			SUCESS_OUT();
+		return;
 	}
-
-	if(!mach){
-		if(mode == LCDMODE_RM){
-			FAILED_OUT("can't find lcd %s to delete", lcdname);
-			goto failed1;
-		}
-		else{
-			p += sprintf(p, "%s %s\n", lcdname, lcdparam);
-			if (mode == LCDMODE_SETCUR){
-				if(set_lcd_index(i)<0)
-					goto failed1;
-			}
-		}
-	}
-
-	if(run_cmd_quiet(NULL, NULL, "%s\"", setcmd)<0)
-		goto failed1;
-
-	SUCESS_OUT();
-failed1:
-	free(setcmd);
 }
 BUILDIN_CMD("set-lcd", set_lcd, match_em5000);
 
