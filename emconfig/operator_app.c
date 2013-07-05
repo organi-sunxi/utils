@@ -13,14 +13,14 @@
 #include "command.h"
 #include "logmessage.h"
 
-static pid_t qt_run_pid=-1;
+static pid_t app_run_pid=-1;
 
 static int stop_running_app(void)
 {
-	if(qt_run_pid > 0){
-		kill(qt_run_pid, SIGINT);
-		waitpid(qt_run_pid, NULL, WNOHANG);
-		qt_run_pid = -1;
+	if(app_run_pid > 0){
+		kill(app_run_pid, SIGINT);
+		waitpid(app_run_pid, NULL, WNOHANG);
+		app_run_pid = -1;
 
 		return 0;
 	}
@@ -35,7 +35,7 @@ static int stop_qtapp()
 	return system(cmd);
 }
 
-static int run_qtapp(const char *fullpathname, const char *cd)
+static int run_app(const char *fullpathname, const char *cd, char *argv[], int system)
 {
 	int ret;
 	pid_t pid;
@@ -50,7 +50,10 @@ static int run_qtapp(const char *fullpathname, const char *cd)
 		if(cd && *cd)
 			chdir(cd);
 
-		execl(fullpathname, fullpathname, "-qws","$QWS_RUN_ARGS", NULL);
+		if(!system)
+			execv(fullpathname, argv);
+		else //search system path
+			execvp(fullpathname, argv);
 		exit(0);
 	}
 	else if(pid<0){
@@ -58,10 +61,24 @@ static int run_qtapp(const char *fullpathname, const char *cd)
 		return pid;
 	}
 
-	qt_run_pid = pid;
+	app_run_pid = pid;
 
 	SUCESS_OUT();
 	return 0;
+}
+
+static int run_qtapp(const char *fullpathname, const char *cd)
+{
+	char * qtargv[]={NULL, "-qws","$QWS_RUN_ARGS", NULL};
+	qtargv[0]=(char*)fullpathname;
+	run_app(fullpathname, cd, qtargv, 0);
+}
+
+static int run_system_app(const char *cmd, const char *cd)
+{
+	char *argv[]={NULL, NULL};
+	argv[0]=(char*)cmd;
+	run_app(cmd, cd, argv, 1);
 }
 
 static void run(int argc, char *argv[])
@@ -79,6 +96,19 @@ static void run(int argc, char *argv[])
 	run_qtapp(argv[1], argc >= 3? argv[2] : NULL);
 }
 BUILDIN_CMD("run", run);
+
+static void runcmd(int argc, char *argv[])
+{
+	LOG("%s\n", __FUNCTION__);
+
+	if (argc < 2) {
+		FAILED_OUT("too few arguments to command 'runcmd'");
+		return;
+	}
+
+	run_system_app(argv[1], argc >= 3? argv[2] : NULL);
+}
+BUILDIN_CMD("runcmd", runcmd);
 
 static void stop(int argc, char *argv[])
 {
