@@ -9,11 +9,19 @@
 #include "command.h"
 #include "logmessage.h"
 
-#define LCD_LIST_FILE	"/usr/local/lcd-list.dat"
+#define LCD_LIST_FILE		"/usr/local/lcd-list.dat"
+#define LCD_LIST_FILE_TMP	"/tmp/lcd-list.dat"
+
+#define LCD_INFO_NAME_SIZE	128
 
 struct local_lcd_info{
-	char name[128];
+	char name[LCD_INFO_NAME_SIZE];
 	struct fb_info info;
+};
+
+struct lcd_info_string{
+	char *name;
+	char *param;
 };
 
 static int match_em6000(const char *platform)
@@ -40,7 +48,7 @@ static char *get_lcd_pol(char* str, enum fb_pol *pol)
 			CASE_CHAR2VAL('O', 'o', POL_LCDONOFF, *pol)
 			CASE_CHAR2VAL('D', 'd', POL_DE, *pol)
 			CASE_CHAR2VAL('P', 'p', POL_PCLK, *pol)
-			CASE_CHAR2VAL('H', 'h', POL_VS, *pol)
+			CASE_CHAR2VAL('H', 'h', POL_HS, *pol)
 			CASE_CHAR2VAL('V', 'v', POL_VS, *pol)
 		}
 		str++;
@@ -79,7 +87,7 @@ static int em6000_load_lcds(int *nlcd, struct local_lcd_info *lcdinfo, struct fb
 	if(fbinfo){
 		if(get_fb_info(fbinfo)){
 			FAILED_OUT("get framebuffer info");
-			return;
+			return -1;
 		}
 		//need it, hbp = hbp+hsw
 	//	fbinfo->hbp -= fbinfo->hsw;
@@ -89,7 +97,7 @@ static int em6000_load_lcds(int *nlcd, struct local_lcd_info *lcdinfo, struct fb
 	pf = fopen(LCD_LIST_FILE, "r");
 	if(pf==NULL){
 		FAILED_OUT("can't find lcd data file");
-		return;
+		return -1;
 	}
 
 	i=0;
@@ -159,6 +167,50 @@ static void output_lcdinfo(struct local_lcd_info *plcdinfo, FILE *f)
 }
 
 #define MAX_LCD_LIST	128
+
+static int em6000_save_lcds(struct lcd_info_string *lcdinfo_str, int n, 
+		struct local_lcd_info *pflcdinfo, int fn)
+{
+	char *lcdparam, *lcdname;
+	int i, j;
+
+	//copy into tmp
+	if(run_cmd_quiet(NULL, NULL, "cp "LCD_LIST_FILE" "LCD_LIST_FILE_TMP)<0)
+		return -1;
+
+	//remove deleted lcd
+	for(j=0;j<fn;j++){
+		lcdname = pflcdinfo[j].name;
+		for(i=0;i<n;i++){
+			if(strcmp(lcdinfo_str[i].name, lcdname)==0){
+				break;
+			}
+		}
+		if(i==n){//not find in new lcd list, remove it
+			if(run_cmd_quiet(NULL, NULL, 
+				"sed -i -e 's/^[[:space:]]*//g;/^\\<%s\\>.*$/d' "LCD_LIST_FILE_TMP, lcdname)<0)
+				return -1;
+		}
+	}
+
+	//add or replace to new
+	for(i=0;i<n;i++){
+		lcdname = lcdinfo_str[i].name;
+		lcdparam = lcdinfo_str[i].param;
+
+		if(run_cmd_quiet(NULL, NULL, 
+			"sed -e 's/^[[:space:]]*//g' "LCD_LIST_FILE_TMP" | grep '^\\<%s\\>'>/dev/null && "
+			"sed -i -e 's/^[[:space:]]*//g;s/^\\<%s\\>.*$/%s %s/g' "LCD_LIST_FILE_TMP" || "
+			"echo \"%s %s\" >> "LCD_LIST_FILE_TMP, 
+			lcdname, lcdname, lcdname, lcdparam, lcdname, lcdparam)<0)
+			return -1;
+	}
+
+	if(run_cmd_quiet(NULL, NULL, "mv "LCD_LIST_FILE_TMP" "LCD_LIST_FILE)<0)
+		return -1;
+
+	return 0;
+}
 
 static void em6000_get_lcd(int argc, char *argv[])
 {
@@ -300,10 +352,10 @@ static int set_lcd_info(struct fb_info *fbinfo)
 
 	ht = fbinfo->hfp + fbinfo->hbp + fbinfo->width + fbinfo->hsw;
 	vt = fbinfo->vfp + fbinfo->vbp + fbinfo->height + fbinfo->vsw;;
-	printf("%d,%d,%d\n", fbinfo->vfp ,fbinfo->vbp ,fbinfo->height);
+//	printf("%d,%d,%d\n", fbinfo->vfp ,fbinfo->vbp ,fbinfo->height);
 	vt <<=1;
 
-	if(run_cmd_quiet(NULL, NULL, "bin2fex %s|sed -e \'s/[[:space:]]*//g\'|"
+	if(run_cmd_quiet(NULL, NULL, "bin2fex %s 2>/dev/null |sed -e \'s/[[:space:]]*//g\'|"
 		AWK_INI_FILE_BEGIN("lcd0_para")
 		AWK_INI_FILE_KEY("lcd_x")
 		AWK_INI_FILE_KEY("lcd_y")
@@ -329,7 +381,6 @@ static int set_lcd_info(struct fb_info *fbinfo)
 		pack.filename,pack.filename,pack.packimg_name_addr, devnum)<0)
 		return -1;
 	
-	SUCESS_OUT();
 	return 0;	
 }
 
@@ -337,35 +388,36 @@ static void em6000_set_lcd(int argc, char *argv[])
 {
 	enum lcdinfo_mode{
 		LCDMODE_SET,
-		LCDMODE_SETCUR,
 		LCDMODE_SETINDEX,
-		LCDMODE_RM,
+		LCDMODE_SAVE,
 	}mode = LCDMODE_SET;
 
+	static char lcd_data_string[MAX_LCD_LIST*256], *p=lcd_data_string;
+	static int count=0;
+	static struct lcd_info_string lcdinfo_str[MAX_LCD_LIST];
+
 	struct local_lcd_info *plcdinfo;
+
+	const char*const short_options ="i:rs";
 	struct fb_info fbinfo;
-	char *lcdname, *lcdparam, cmd[MAX_STRING];
-	int nlcd, i, match;
-	int next_option;
-	const char*const short_options ="ci:r:";
+	int nlcd, i, match, next_option;
 	
 	LOG("%s\n", __FUNCTION__);
 
 	optind=0;
 	while((next_option =getopt(argc,argv,short_options))!=-1) {
 		switch (next_option){
-		case 'c':
-			mode = LCDMODE_SETCUR;
-			break;
 		case 'i':
 			mode = LCDMODE_SETINDEX;
 			i = strtol(optarg, NULL, 0);
 			break; 
-		case 'r':
-			mode = LCDMODE_RM;
-			lcdname = optarg;
-			lcdparam = "";
-			break; 
+		case 'r':	//remove all
+			count = 0;
+			p = lcd_data_string;
+			return;
+		case 's':
+			mode = LCDMODE_SAVE;
+			break;
 		case -1:	//Done with options.
 			break; 
 		default:
@@ -374,61 +426,45 @@ static void em6000_set_lcd(int argc, char *argv[])
 		}
 	}
 
+	if(mode==LCDMODE_SET){
+		if(argc < optind+2){
+			FAILED_OUT("too few arguments");
+			return;
+		}
+
+		strcpy(p, argv[optind]);
+		lcdinfo_str[count].name = p;
+		p+=strlen(argv[optind])+1;
+
+		strcpy(p, argv[optind+1]);
+		lcdinfo_str[count].param = p;
+		p+=strlen(argv[optind+1])+1;
+
+		count++;
+		return;
+	}
+
 	plcdinfo=malloc(MAX_LCD_LIST*sizeof(struct local_lcd_info));
+	if(!plcdinfo)
+		return;
+
 	nlcd=MAX_LCD_LIST;
 	match = em6000_load_lcds(&nlcd, plcdinfo, &fbinfo);
 
-	if(mode == LCDMODE_SETINDEX){
+	switch(mode){
+	case LCDMODE_SETINDEX:
 		if(i>=nlcd){
 			FAILED_OUT("out of lcd list range");
 			goto out;
 		}
-		
 		if(set_lcd_info(&plcdinfo[i].info)<0)
 			goto out;
 		SUCESS_OUT();
 		goto out;
-	}
-
-	if(mode == LCDMODE_SET || mode == LCDMODE_SETCUR){
-		if(argc < optind+2){
-			FAILED_OUT("too few arguments");
-			goto out;
-		}
-		lcdname = argv[optind];
-		lcdparam = argv[optind+1];
-
-		if(str2fbinfo(lcdparam, &fbinfo)<0){
-			FAILED_OUT("lcd parameter format error");
-			goto out;
-		}
-
-		if(run_cmd_quiet(NULL, NULL, 
-			"sed -e 's/^[[:space:]]*//g' "LCD_LIST_FILE" | grep '^\\<%s\\>'>/dev/null && "
-			"sed -i -e 's/^[[:space:]]*//g;s/^\\<%s\\>.*$/%s %s/g' "LCD_LIST_FILE" || "
-			"echo \"%s %s\" >> "LCD_LIST_FILE, 
-			lcdname, lcdname, lcdname, lcdparam, lcdname, lcdparam)<0)
-			goto out;
-
-		if(mode == LCDMODE_SETCUR){
-			if(set_lcd_info(&fbinfo)<0)
-				goto out;
-		}
-
-		SUCESS_OUT();
-		return;
-	}
-
-	if(mode == LCDMODE_RM){
-		if(strcmp(plcdinfo[match].name,lcdname) == 0){
-			FAILED_OUT("can't delete current lcd");
-			goto out;
-		}
-		if(run_cmd_quiet(NULL, NULL, 
-			"sed -i -e 's/^[[:space:]]*//g;/^\\<%s\\>.*$/d' "LCD_LIST_FILE, lcdname)<0)
-			goto out;
-
-		SUCESS_OUT();
+	case LCDMODE_SAVE:
+		if(em6000_save_lcds(lcdinfo_str,count, plcdinfo, nlcd)==0)
+			SUCESS_OUT();
+		goto out;
 	}
 
 out:
