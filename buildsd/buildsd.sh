@@ -17,6 +17,8 @@ TOOLSDIR=$TOPDIR/utils
 
 SPLASH_FILE=$TOPDIR/simit-320x240-24bit.bmp
 
+MAKE_OPT=-j8
+
 ######################################################################
 # parse parameter
 
@@ -163,7 +165,7 @@ cd $UBOOTDIR
 if [ "$TARGET_SDCARD" = "true" ]
 then
 make CROSS_COMPILE=$UBOOT_CROSS_COMPILE distclean
-make CROSS_COMPILE=$UBOOT_CROSS_COMPILE Mele_A1000
+make CROSS_COMPILE=$UBOOT_CROSS_COMPILE Mele_A1000 $MAKE_OPT
 sudo dd if=./spl/sunxi-spl.bin of=$TARGET bs=1024 seek=8
 sudo dd if=./u-boot.bin of=$TARGET bs=1024 seek=32
 fi
@@ -172,7 +174,7 @@ fi
 if [ "$TARGET_UBOOT" = "true" ]
 then
 make CROSS_COMPILE=$UBOOT_CROSS_COMPILE distclean
-make CROSS_COMPILE=$UBOOT_CROSS_COMPILE EM6000
+make CROSS_COMPILE=$UBOOT_CROSS_COMPILE EM6000 $MAKE_OPT
 
 # sunxi-spl.bin & u-boot.bin
 cp spl/sunxi-spl.bin $MOUNTDIR
@@ -193,7 +195,7 @@ cd $LINUXDIR
 if [ "$TARGET_KERNEL" = "true" ]
 then
 make ARCH=arm em6000_fast_defconfig
-make ARCH=arm CROSS_COMPILE=$LINUX_CROSS_COMPILE uImage LOADADDR=0x48000000
+make ARCH=arm CROSS_COMPILE=$LINUX_CROSS_COMPILE uImage LOADADDR=0x48000000 $MAKE_OPT
 cp arch/arm/boot/uImage $MOUNTDIR
 fi
 
