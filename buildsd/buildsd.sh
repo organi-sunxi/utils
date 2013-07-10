@@ -220,7 +220,7 @@ do
 	rm -rf arch/arm/boot/dts/$FILENAME.dts
 	mkdir -p $MOUNTDIR/$CHIP
 	cp arch/arm/boot/$FILENAME.dtb $MOUNTDIR/$CHIP/em6000.dtb
-	$TOOLSDIR/packimg/packimg $PSIZE $MOUNTDIR/$CHIP/em6000.dtb@44000000 $MOUNTDIR/script.bin@43000000 $MOUNTDIR/splash.bin@43100000 $MOUNTDIR/$CHIP/pack.img
+	$TOOLSDIR/packimg/packimg -p $PSIZE $MOUNTDIR/$CHIP/em6000.dtb@44000000 $MOUNTDIR/script.bin@43000000 $MOUNTDIR/splash.bin@43100000 $MOUNTDIR/$CHIP/pack.img
 done
 
 fi
