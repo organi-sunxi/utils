@@ -5,7 +5,7 @@
 
 TOPDIR=/home/yuq/projects/a10
 TARGET=/dev/sdf
-MOUNTDIR=/mnt/sddisk
+MOUNTDIR=$PWD/sddisk
 UBOOT_CROSS_COMPILE=arm-none-eabi-
 LINUX_CROSS_COMPILE=arm-linux-gnueabihf-
 BOARD=em6000
@@ -115,7 +115,7 @@ esac
 # create for TARGET
 if [ "$TARGET_SDCARD" = "true" ]
 then
-sudo mkdir -p $MOUNTDIR
+mkdir -p $MOUNTDIR
 cat <<EOF | sudo fdisk $TARGET
 o
 n
@@ -130,7 +130,7 @@ sudo mkfs.vfat -I ${TARGET}1
 echo "mount sdcard ${TARGET}1 on $MOUNTDIR"
 sudo mount "${TARGET}1" $MOUNTDIR
 else
-sudo mkdir -p $MOUNTDIR
+mkdir -p $MOUNTDIR
 fi
 
 ###################################################################
@@ -147,7 +147,7 @@ make
 
 # splash.bin
 ./mksplash -b32 $SPLASH_FILE
-sudo cp splash.bin $MOUNTDIR
+cp splash.bin $MOUNTDIR
 
 # packimg
 cd ../packimg
@@ -175,13 +175,13 @@ make CROSS_COMPILE=$UBOOT_CROSS_COMPILE distclean
 make CROSS_COMPILE=$UBOOT_CROSS_COMPILE EM6000
 
 # sunxi-spl.bin & u-boot.bin
-sudo cp spl/sunxi-spl.bin $MOUNTDIR
-sudo cp u-boot.bin $MOUNTDIR
+cp spl/sunxi-spl.bin $MOUNTDIR
+cp u-boot.bin $MOUNTDIR
 
 # em6000.env
 cd bootscript
 make
-sudo cp em6000.env $MOUNTDIR
+cp em6000.env $MOUNTDIR
 fi
 
 ###################################################################
@@ -194,7 +194,7 @@ if [ "$TARGET_KERNEL" = "true" ]
 then
 make ARCH=arm em6000_fast_defconfig
 make ARCH=arm CROSS_COMPILE=$LINUX_CROSS_COMPILE uImage LOADADDR=0x48000000
-sudo cp arch/arm/boot/uImage $MOUNTDIR
+cp arch/arm/boot/uImage $MOUNTDIR
 fi
 
 # pack all
@@ -204,7 +204,7 @@ then
 # script.bin
 cd sunxi-board
 ./fex2bin $BOARD.fex script.bin
-sudo cp script.bin $MOUNTDIR
+cp script.bin $MOUNTDIR
 cd ..
 
 # em6000.dtb & pack.img
@@ -218,9 +218,9 @@ do
     sed "s/<mtdparts>/$MTDPARTS/" arch/arm/boot/dts/em6000-var.dts > arch/arm/boot/dts/$FILENAME.dts
 	make ARCH=arm $FILENAME.dtb
 	rm -rf arch/arm/boot/dts/$FILENAME.dts
-	sudo mkdir -p $MOUNTDIR/$CHIP
-	sudo cp arch/arm/boot/$FILENAME.dtb $MOUNTDIR/$CHIP/em6000.dtb
-	sudo $TOOLSDIR/packimg/packimg $PSIZE $MOUNTDIR/$CHIP/em6000.dtb@44000000 $MOUNTDIR/script.bin@43000000 $MOUNTDIR/splash.bin@43100000 $MOUNTDIR/$CHIP/pack.img
+	mkdir -p $MOUNTDIR/$CHIP
+	cp arch/arm/boot/$FILENAME.dtb $MOUNTDIR/$CHIP/em6000.dtb
+	$TOOLSDIR/packimg/packimg $PSIZE $MOUNTDIR/$CHIP/em6000.dtb@44000000 $MOUNTDIR/script.bin@43000000 $MOUNTDIR/splash.bin@43100000 $MOUNTDIR/$CHIP/pack.img
 done
 
 fi
@@ -238,7 +238,7 @@ do
 	CHIP=${CHIPS[$i]}
 	make clean
 	make TARGET_CHIP=$CHIP
-	sudo cp rootfs.img initfs.img $MOUNTDIR/$CHIP
+	cp rootfs.img initfs.img $MOUNTDIR/$CHIP
 done
 
 fi
