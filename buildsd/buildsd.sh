@@ -239,9 +239,12 @@ then
 for i in ${!CHIPS[*]}
 do
 	CHIP=${CHIPS[$i]}
+	BSIZE=${BLOCK_SIZE[$CHIP]}
+	PSIZE=${PAGE_SIZE[$CHIP]}
+	CHIPSTR=b${BSIZE%[k|K]}p$((PSIZE/1024))
 	make clean
-	make TARGET_CHIP=$CHIP
-	cp rootfs.img initfs.img $MOUNTDIR/$CHIPSTR
+	make TARGET_CHIP=$CHIP rootfs.img
+	cp rootfs.img $MOUNTDIR/$CHIPSTR
 done
 
 fi
