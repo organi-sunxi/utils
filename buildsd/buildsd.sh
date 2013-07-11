@@ -72,8 +72,8 @@ done
 ######################################################################
 # chip parameter
 
-declare -a BLOCK_SIZE
-declare -a SPL_SIZE
+declare -A BLOCK_SIZE
+declare -A PAGE_SIZE
 
 CHIPS=(K9GBG08U0A K9F4G08U0A)
 # K9GBG08U0A
