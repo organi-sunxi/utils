@@ -215,14 +215,15 @@ do
 	CHIP=${CHIPS[$i]}
 	BSIZE=${BLOCK_SIZE[$CHIP]}
 	PSIZE=${PAGE_SIZE[$CHIP]}
-	FILENAME=em6000-$CHIP
+	CHIPSTR=b${BSIZE%[k|K]}p$((PSIZE/1024))
+	FILENAME=em6000-$CHIPSTR
 	get_mtdparts $BSIZE $PSIZE
     sed "s/<mtdparts>/$MTDPARTS/" arch/arm/boot/dts/em6000-var.dts > arch/arm/boot/dts/$FILENAME.dts
 	make ARCH=arm $FILENAME.dtb
 	rm -rf arch/arm/boot/dts/$FILENAME.dts
-	mkdir -p $MOUNTDIR/$CHIP
-	cp arch/arm/boot/$FILENAME.dtb $MOUNTDIR/$CHIP/em6000.dtb
-	$TOOLSDIR/packimg/packimg -p $PSIZE $MOUNTDIR/$CHIP/em6000.dtb@44000000 $MOUNTDIR/script.bin@43000000 $MOUNTDIR/splash.bin@43100000 $MOUNTDIR/$CHIP/pack.img
+	mkdir -p $MOUNTDIR/$CHIPSTR
+	cp arch/arm/boot/$FILENAME.dtb $MOUNTDIR/$CHIPSTR/em6000.dtb
+	$TOOLSDIR/packimg/packimg -p $PSIZE $MOUNTDIR/$CHIPSTR/em6000.dtb@44000000 $MOUNTDIR/script.bin@43000000 $MOUNTDIR/splash.bin@43100000 $MOUNTDIR/$CHIPSTR/pack.img
 done
 
 fi
@@ -240,7 +241,7 @@ do
 	CHIP=${CHIPS[$i]}
 	make clean
 	make TARGET_CHIP=$CHIP
-	cp rootfs.img initfs.img $MOUNTDIR/$CHIP
+	cp rootfs.img initfs.img $MOUNTDIR/$CHIPSTR
 done
 
 fi
