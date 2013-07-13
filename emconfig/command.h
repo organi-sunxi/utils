@@ -9,6 +9,7 @@ typedef struct
 }command_t;
 
 void deal_command(char *cmdline);
+void parse_args(char *cmdline, int *argc, char **argv);
 
 //usage: BUILDIN_CMD("cmd", cmd_func) or BUILDIN_CMD("cmd", cmd_func, match_func)
 #define BUILDIN_CMD(c,f,...)	static command_t f##_buildin_cmd \

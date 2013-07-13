@@ -50,7 +50,7 @@ BUILDIN_CMD("exit", exit_cmd);
 
 #define STATE_WHITESPACE (0)
 #define STATE_WORD (1)
-static void parse_args(char *cmdline, int *argc, char **argv)
+void parse_args(char *cmdline, int *argc, char **argv)
 {
 	char *ch = cmdline;
 	int state = STATE_WHITESPACE;

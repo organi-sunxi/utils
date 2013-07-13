@@ -69,7 +69,13 @@ static int run_app(const char *fullpathname, const char *cd, char *argv[], int s
 
 static int run_qtapp(const char *fullpathname, const char *cd)
 {
-	char * qtargv[]={NULL, "-qws","$QWS_RUN_ARGS", NULL};
+	int n;
+	char *qtargv[MAX_ARGS]={NULL, "-qws"};
+	char *env = getenv("QWS_RUN_ARGS");
+
+	parse_args(env, &n, qtargv+2);
+	qtargv[n+2]=NULL;
+
 	qtargv[0]=(char*)fullpathname;
 	run_app(fullpathname, cd, qtargv, 0);
 }
