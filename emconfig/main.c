@@ -116,7 +116,8 @@ int main(int argc, char *argv[])
 
 	for (;;) {
 		printf(">");
-		fgets(cmdline, sizeof(cmdline), stdin);
+		if(fgets(cmdline, sizeof(cmdline), stdin)==NULL)
+			break;
 		deal_command(cmdline);
 	}
 
