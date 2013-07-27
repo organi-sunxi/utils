@@ -11,6 +11,7 @@
 
 #define LCD_LIST_FILE		"/usr/local/lcd-list.dat"
 #define LCD_LIST_FILE_TMP	"/tmp/lcd-list.dat"
+#define TMP_PACKIMG_DEV_NAME	"/dev/mtd-packimg"
 
 #define LCD_INFO_NAME_SIZE	128
 
@@ -325,6 +326,9 @@ static int unpackimg_out_cbk(struct unpackimg_out_t *pack, char out[], int n)
 	return 0;
 }
 
+#define create_packimg_node(n)	run_cmd_quiet(NULL, NULL, "mknod "TMP_PACKIMG_DEV_NAME" c 90 %d", n*2)
+#define remove_packimg_node()	run_cmd_quiet(NULL, NULL, "rm "TMP_PACKIMG_DEV_NAME)
+
 #define AWK_INI_FILE_BEGIN(sec)	"awk -F \'=\' \'/^\\[/{a=0}/\\["sec"\\]/{a=1}a==1{"
 #define AWK_INI_FILE_KEY(key)	"if($1==\""key"\")print $1\"=%d\";else "
 #define AWK_INI_FILE_END()	"print $0;next;}{print $0}\'"
@@ -376,11 +380,20 @@ static int set_lcd_info(struct fb_info *fbinfo)
 		return -1;
 	}
 
-	if(run_cmd_quiet(NULL, NULL, "mv %stmp %s &&"
-		"packimg %s pack.img && packimg_burn -d /dev/mtd%s -c5 -f pack.img",
-		pack.filename,pack.filename,pack.packimg_name_addr, devnum)<0)
+	if(create_packimg_node(atoi(devnum))<0){
+		FAILED_OUT("create packimg node");
 		return -1;
+	}
+		
+	if(run_cmd_quiet(NULL, NULL, "mv %stmp %s &&"
+		"packimg -d "TMP_PACKIMG_DEV_NAME" %s pack.img && "
+		"packimg_burn -d "TMP_PACKIMG_DEV_NAME" -c5 -f pack.img",
+		pack.filename,pack.filename,pack.packimg_name_addr)<0){
+		remove_packimg_node();
+		return -1;
+	}
 	
+	remove_packimg_node();
 	return 0;	
 }
 
@@ -548,11 +561,19 @@ static void set_splash(int argc, char *argv[])
 		fbinfo.bpp, pack.filename, argv[1])<0)
 		return;
 
-	if(run_cmd_quiet(NULL, NULL, "packimg %s pack.img && "
-		"packimg_burn -d /dev/mtd%s -c5 -f pack.img",
-		pack.packimg_name_addr, devnum)<0)
+	if(create_packimg_node(atoi(devnum))<0){
+		FAILED_OUT("create packimg node");
 		return;
+	}
+
+	if(run_cmd_quiet(NULL, NULL, "packimg -d "TMP_PACKIMG_DEV_NAME" %s pack.img && "
+		"packimg_burn -d "TMP_PACKIMG_DEV_NAME" -c5 -f pack.img",
+		pack.packimg_name_addr)<0){
+		remove_packimg_node();
+		return;
+	}
 	
+	remove_packimg_node();
 	SUCESS_OUT();
 }
 BUILDIN_CMD("set-splash", set_splash, match_em6000);
