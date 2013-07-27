@@ -117,18 +117,35 @@ end:
 	return ret;
 }
 
+static unsigned long get_mtd_erase_size()
+{
+	char buf[128];
+	FILE *fp;
+	unsigned long s=0;
+
+	fp = popen("cat /proc/mtd | awk '/^mtd0/{print $3}'", "r");
+	assert(fp);
+
+	while(fgets(buf, sizeof(buf), fp) != NULL){
+		s = strtol(buf, NULL, 16);
+	}
+
+	assert(pclose(fp)==0);
+
+	return s;
+}
+
 static int dump_pack(int fd)
 {
-	mtd_info_t mtd;
 	loff_t noffs=0;
 	int t;
-	
-	assert((t = open("/dev/mtd0", O_RDONLY)) >= 0);
-	assert(ioctl(t, MEMGETINFO, &mtd) == 0);
-	close(t);
+	unsigned long es;
+
+	es = get_mtd_erase_size();
+	assert(es != 0);
 
 	while((t=dump_pack_once(fd,noffs))>0){
-		noffs += mtd.erasesize;
+		noffs += es;
 	}
 
 	return t;
