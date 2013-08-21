@@ -165,9 +165,10 @@ cd $UBOOTDIR
 if [ "$TARGET_SDCARD" = "true" ]
 then
 make CROSS_COMPILE=$UBOOT_CROSS_COMPILE distclean
-make CROSS_COMPILE=$UBOOT_CROSS_COMPILE Mele_A1000 $MAKE_OPT
+make CROSS_COMPILE=$UBOOT_CROSS_COMPILE EM6000_MMC $MAKE_OPT
+make u-boot.img
 sudo dd if=./spl/sunxi-spl.bin of=$TARGET bs=1024 seek=8
-sudo dd if=./u-boot.bin of=$TARGET bs=1024 seek=32
+sudo dd if=./u-boot.img of=$TARGET bs=1024 seek=32
 fi
 
 # NAND uboot
