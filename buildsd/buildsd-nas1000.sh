@@ -8,7 +8,7 @@ export TARGET=/dev/sdf
 export MOUNTDIR=$PWD/sddisk
 export UBOOT_CROSS_COMPILE=arm-none-eabi-
 export LINUX_CROSS_COMPILE=arm-linux-gnueabihf-
-export LINUX_DEFAULT_CONFIG=nas1000_defconfig
+export LINUX_DEFAULT_CONFIG=sun7i_nas1000_defconfig
 export BOARD=nas1000
 
 export UBOOTDIR=$TOPDIR/sunxi-uboot
@@ -20,4 +20,36 @@ export SPLASH_FILE=$TOPDIR/simit-320x240-24bit.bmp
 
 export MAKE_OPT=-j8
 
-bash buildsd.sh $@
+######################################################################
+# mtd partition
+# spl,uboot,packimg,kernel,initfs(rescue image include packimg2 and kernel),rootfs(for rescue)
+
+function get_mtdparts {
+case "$1" in
+128K)
+	let "OFFSET=$2*128+0x200000+0x080000"
+	MTDPARTS="4M@$OFFSET(packimg),5M(kernel)"
+	;;
+256K)
+	let "OFFSET=$2*128+0x200000+0x100000"
+	MTDPARTS="4M@$OFFSET(packimg),5M(kernel)"
+	;;
+512K)
+	let "OFFSET=$2*128+0x280000+0x180000"
+	MTDPARTS="5M@$OFFSET(packimg),6M(kernel)"
+	;;
+1024K)
+	let "OFFSET=$2*128+0x400000+0x300000"
+	MTDPARTS="8M@$OFFSET(packimg),8M(kernel)"
+	;;
+2048K)
+	let "OFFSET=$2*128+0x800000+0x600000"
+	MTDPARTS="12M@$OFFSET(packimg),12M(kernel)"
+	;;
+*)
+	echo "unsupported block size"
+	;;
+esac
+}
+
+source buildsd.sh $@
