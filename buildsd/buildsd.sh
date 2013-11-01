@@ -1,26 +1,9 @@
 #!/bin/bash
 
 ######################################################################
-# config
-
-TOPDIR=/home/yuq/projects/a10
-TARGET=/dev/sdf
-MOUNTDIR=$PWD/sddisk
-UBOOT_CROSS_COMPILE=arm-none-eabi-
-LINUX_CROSS_COMPILE=arm-linux-gnueabihf-
-BOARD=em6000
-
-UBOOTDIR=$TOPDIR/sunxi-uboot
-LINUXDIR=$TOPDIR/linux-a10
-ROOTFSDIR=$TOPDIR/em6000-root
-TOOLSDIR=$TOPDIR/utils
-
-SPLASH_FILE=$TOPDIR/simit-320x240-24bit.bmp
-
-MAKE_OPT=-j8
-
-######################################################################
 # parse parameter
+
+BOARD_CAP=`echo $BOARD | tr 'a-z' 'A-Z'`
 
 TARGET_SDCARD=false
 TARGET_UBOOT=false
@@ -165,7 +148,7 @@ cd $UBOOTDIR
 if [ "$TARGET_SDCARD" = "true" ]
 then
 make CROSS_COMPILE=$UBOOT_CROSS_COMPILE distclean
-make CROSS_COMPILE=$UBOOT_CROSS_COMPILE EM6000_MMC $MAKE_OPT
+make CROSS_COMPILE=$UBOOT_CROSS_COMPILE $(BOARD_CAP)_MMC $MAKE_OPT
 make u-boot.img
 sudo dd if=./spl/sunxi-spl.bin of=$TARGET bs=1024 seek=8
 sudo dd if=./u-boot.img of=$TARGET bs=1024 seek=32
@@ -175,7 +158,7 @@ fi
 if [ "$TARGET_UBOOT" = "true" ]
 then
 make CROSS_COMPILE=$UBOOT_CROSS_COMPILE distclean
-make CROSS_COMPILE=$UBOOT_CROSS_COMPILE EM6000 $MAKE_OPT
+make CROSS_COMPILE=$UBOOT_CROSS_COMPILE $BOARD_CAP $MAKE_OPT
 
 # sunxi-spl.bin & u-boot.bin
 cp spl/sunxi-spl.bin $MOUNTDIR
@@ -184,7 +167,7 @@ cp u-boot.bin $MOUNTDIR
 # em6000.env
 cd bootscript
 make
-cp em6000.env $MOUNTDIR
+cp $BOARD.env $MOUNTDIR
 fi
 
 ###################################################################
@@ -195,7 +178,7 @@ cd $LINUXDIR
 # uImage
 if [ "$TARGET_KERNEL" = "true" ]
 then
-make ARCH=arm em6000_fast_defconfig
+make ARCH=arm $LINUX_DEFAULT_CONFIG
 make ARCH=arm CROSS_COMPILE=$LINUX_CROSS_COMPILE uImage LOADADDR=0x48000000 $MAKE_OPT
 cp arch/arm/boot/uImage $MOUNTDIR
 fi
@@ -217,14 +200,14 @@ do
 	BSIZE=${BLOCK_SIZE[$CHIP]}
 	PSIZE=${PAGE_SIZE[$CHIP]}
 	CHIPSTR=b${BSIZE%[k|K]}p$((PSIZE/1024))
-	FILENAME=em6000-$CHIPSTR
+	FILENAME=$BOARD-$CHIPSTR
 	get_mtdparts $BSIZE $PSIZE
-    sed "s/<mtdparts>/$MTDPARTS/" arch/arm/boot/dts/em6000-var.dts > arch/arm/boot/dts/$FILENAME.dts
+	sed "s/<mtdparts>/$MTDPARTS/" arch/arm/boot/dts/$BOARD-var.dts > arch/arm/boot/dts/$FILENAME.dts
 	make ARCH=arm $FILENAME.dtb
 	rm -rf arch/arm/boot/dts/$FILENAME.dts
 	mkdir -p $MOUNTDIR/$CHIPSTR
-	cp arch/arm/boot/$FILENAME.dtb $MOUNTDIR/$CHIPSTR/em6000.dtb
-	$TOOLSDIR/packimg/packimg -p $PSIZE $MOUNTDIR/$CHIPSTR/em6000.dtb@44000000 $MOUNTDIR/script.bin@43000000 $MOUNTDIR/splash.bin@43100000 $MOUNTDIR/$CHIPSTR/pack.img
+	cp arch/arm/boot/$FILENAME.dtb $MOUNTDIR/$CHIPSTR/$BOARD.dtb
+	$TOOLSDIR/packimg/packimg -p $PSIZE $MOUNTDIR/$CHIPSTR/$BOARD.dtb@44000000 $MOUNTDIR/script.bin@43000000 $MOUNTDIR/splash.bin@43100000 $MOUNTDIR/$CHIPSTR/pack.img
 done
 
 fi
