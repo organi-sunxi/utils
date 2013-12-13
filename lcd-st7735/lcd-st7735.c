@@ -37,6 +37,8 @@
 #define ST7735_GMCTRP1  (0xE0)
 #define ST7735_GMCTRN1  (0xE1)
 
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof(*a))
+
 struct st7735_ctrl{
 	int spidev_fd;
 	int rs_fd;
@@ -48,7 +50,7 @@ static int init_lcdctrl(char *spidev, char *gpio)
 {
 	int fd;
 	uint8_t data;
-	uint32_t speed=12000000;
+	uint32_t speed=20000000;
 
 	fd = open(spidev, O_RDWR);
 	if (fd < 0){
@@ -100,7 +102,6 @@ static void st7735WriteByte(int iscmd, uint8_t data)
 	read(lcdctrl.rs_fd, &d1, 1);
 	if(d1 != d){
 		write(lcdctrl.rs_fd, &d, 1);
-		usleep(1);
 	}
 
 	ret = ioctl(lcdctrl.spidev_fd, SPI_IOC_MESSAGE(1), &tr);
@@ -122,12 +123,11 @@ static void st7735WriteDataSerial(void* buf, int size)
 	if(d != '1'){
 		d = '1';
 		write(lcdctrl.rs_fd, &d, 1);
-		usleep(1);
 	}
 
 	ret = ioctl(lcdctrl.spidev_fd, SPI_IOC_MESSAGE(1), &tr);
 	if (ret < 1)
-		printf("can't send spi message\n");
+		printf("can't send spi message ret=%d\n", ret);
 }
 
 
@@ -229,7 +229,7 @@ static void st7735InitDisplay(void)
 	st7735WriteData(0x00);
 	st7735WriteData(0x00);          // XSTART = 0
 	st7735WriteData(0x00);
-	st7735WriteData(127);          // XEND = 129
+	st7735WriteData(127);          // XEND = 127
 
 	st7735WriteCmd(ST7735_RASET);   // row addr set
 	st7735WriteData(0x00);
@@ -259,21 +259,25 @@ void st7735SetAddrWindow(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1)
 	st7735WriteData(y1+1);          // YEND
 }
 
-void lcdFillRGB(uint16_t color)
+static uint16_t frame[LCD_WIDTH*LCD_HEIGHT];
+
+static void lcd_update(void)
 {
-	int i;
-	uint16_t line[LCD_WIDTH];
-
-	for(i=0;i<LCD_WIDTH;i++)
-		line[i]=(color&0xff)<<8|(color>>8);
-
 	st7735SetAddrWindow(0, 0, LCD_WIDTH-1, LCD_HEIGHT-1);
 	st7735WriteCmd(ST7735_RAMWR);  // write to RAM
 
-	for (i=0; i<LCD_HEIGHT; i++){
-		st7735WriteDataSerial(line, sizeof(line));
-	}
+	st7735WriteDataSerial(frame, sizeof(frame));
 	st7735WriteCmd(ST7735_NOP);
+}
+
+void lcdFillRGB(uint16_t color)
+{
+	int i;
+
+	for(i=0;i<ARRAY_SIZE(frame);i++)
+		frame[i]=(color&0xff)<<8|(color>>8);
+
+	lcd_update();
 }
 
 int main(int argc, char **argv)
