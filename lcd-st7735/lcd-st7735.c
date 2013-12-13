@@ -7,7 +7,7 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <linux/types.h>
-#include <linux/spi/spidev.h>
+#include "spidev.h"
 
 #define LCD_WIDTH	128
 #define LCD_HEIGHT	128
@@ -48,7 +48,7 @@ static int init_lcdctrl(char *spidev, char *gpio)
 {
 	int fd;
 	uint8_t data;
-	uint32_t speed=1000000;
+	uint32_t speed=12000000;
 
 	fd = open(spidev, O_RDWR);
 	if (fd < 0){
@@ -87,39 +87,65 @@ static int init_lcdctrl(char *spidev, char *gpio)
 	return 0;
 }
 
-static void st7735Write(int iscmd, uint8_t data)
+static void st7735WriteByte(int iscmd, uint8_t data)
 {
 	int ret;
-	uint8_t d = iscmd?'0':'1';
+	uint8_t d = iscmd?'0':'1', d1;
 	struct spi_ioc_transfer tr = {
 		.tx_buf = (unsigned long)&data,
 		.rx_buf = 0,
 		.len = 1,
-		.delay_usecs = 100,
-		.speed_hz = 1000000,
-		.bits_per_word = 8,
 	};
 
-	write(lcdctrl.rs_fd, &d, 1);
+	read(lcdctrl.rs_fd, &d1, 1);
+	if(d1 != d){
+		write(lcdctrl.rs_fd, &d, 1);
+		usleep(1);
+	}
+
 	ret = ioctl(lcdctrl.spidev_fd, SPI_IOC_MESSAGE(1), &tr);
 	if (ret < 1)
 		printf("can't send spi message\n");
 }
 
+static void st7735WriteDataSerial(void* buf, int size)
+{
+	int ret;
+	uint8_t d;
+	struct spi_ioc_transfer tr = {
+		.tx_buf = (unsigned long)buf,
+		.rx_buf = 0,
+		.len = size,
+	};
+
+	read(lcdctrl.rs_fd, &d, 1);
+	if(d != '1'){
+		d = '1';
+		write(lcdctrl.rs_fd, &d, 1);
+		usleep(1);
+	}
+
+	ret = ioctl(lcdctrl.spidev_fd, SPI_IOC_MESSAGE(1), &tr);
+	if (ret < 1)
+		printf("can't send spi message\n");
+}
+
+
 static void st7735WriteCmd(uint8_t command)
 {
-	st7735Write(1, command);
+	st7735WriteByte(1, command);
 }
 
 static void st7735WriteData(uint8_t data)
 {
-	st7735Write(0, data);
+	st7735WriteByte(0, data);
 }
 
 static void st7735InitDisplay(void)
 {
 	st7735WriteCmd(ST7735_SWRESET); // software reset
 	usleep(50);
+
 	st7735WriteCmd(ST7735_SLPOUT);  // out of sleep mode
 	usleep(500);
 
@@ -127,7 +153,7 @@ static void st7735InitDisplay(void)
 	st7735WriteData(0x05);          // 16-bit color
 	usleep(10);
 
-	st7735WriteCmd(ST7735_FRMCTR1); // frame rate control
+/*	st7735WriteCmd(ST7735_FRMCTR1); // frame rate control
 	st7735WriteData(0x00);          // fastest refresh
 	st7735WriteData(0x06);          // 6 lines front porch
 	st7735WriteData(0x03);          // 3 lines backporch
@@ -198,18 +224,18 @@ static void st7735InitDisplay(void)
 	st7735WriteData(0x02); 
 	st7735WriteData(0x0F); 
 	usleep(10);
-
+*/
 	st7735WriteCmd(ST7735_CASET);   // column addr set
 	st7735WriteData(0x00);
-	st7735WriteData(0x02);          // XSTART = 2
+	st7735WriteData(0x00);          // XSTART = 0
 	st7735WriteData(0x00);
-	st7735WriteData(0x81);          // XEND = 129
+	st7735WriteData(127);          // XEND = 129
 
 	st7735WriteCmd(ST7735_RASET);   // row addr set
 	st7735WriteData(0x00);
-	st7735WriteData(0x02);          // XSTART = 2
+	st7735WriteData(0x00);          // XSTART = 0
 	st7735WriteData(0x00);
-	st7735WriteData(0x81);          // XEND = 129
+	st7735WriteData(127);          // XEND = 127
 
 	st7735WriteCmd(ST7735_NORON);   // normal display on
 	usleep(10);
@@ -235,21 +261,30 @@ void st7735SetAddrWindow(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1)
 
 void lcdFillRGB(uint16_t color)
 {
-	uint8_t x, y;
+	int i;
+	uint16_t line[LCD_WIDTH];
+
+	for(i=0;i<LCD_WIDTH;i++)
+		line[i]=(color&0xff)<<8|(color>>8);
+
 	st7735SetAddrWindow(0, 0, LCD_WIDTH-1, LCD_HEIGHT-1);
 	st7735WriteCmd(ST7735_RAMWR);  // write to RAM
-	for (x=0; x < LCD_WIDTH; x++){
-	    for (y=0; y < LCD_HEIGHT; y++){
-			st7735WriteData(color >> 8);
-			st7735WriteData(color);
-		}
+
+	for (i=0; i<LCD_HEIGHT; i++){
+		st7735WriteDataSerial(line, sizeof(line));
 	}
 	st7735WriteCmd(ST7735_NOP);
 }
 
 int main(int argc, char **argv)
 {
-	init_lcdctrl("/dev/spidev0.0", "/sys/");
+	if(init_lcdctrl("/dev/spidev0.0", "/sys/class/gpio/gpio2_pi13/value")<0)
+		return -1;
+
+	st7735InitDisplay();
+
+	lcdFillRGB(1<<10);
+	
 	return 0;
 }
 
