@@ -3,7 +3,7 @@
 CROSS_COMPILE ?= arm-linux-gnueabihf-
 CFLAGS=
 
-SRC=lcd-st7735.c
+SRC=lcd-st7735.c bmp.c
 OBJ=$(SRC:.c=.o)
 
 all: $(OBJ) lcd-st7735

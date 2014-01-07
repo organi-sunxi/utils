@@ -8,6 +8,7 @@
 #include <sys/ioctl.h>
 #include <linux/types.h>
 #include "spidev.h"
+#include "bmp.h"
 
 #define LCD_WIDTH	128
 #define LCD_HEIGHT	128
@@ -285,9 +286,14 @@ int main(int argc, char **argv)
 	if(init_lcdctrl("/dev/spidev0.0", "/sys/class/gpio/gpio2_pi13/value")<0)
 		return -1;
 
-	st7735InitDisplay();
+	if(argc==1){
+		st7735InitDisplay();
+		lcdFillRGB(1<<10);
+		return 0;
+	}
 
-	lcdFillRGB(1<<10);
+	fillbmp24to16(argv[1], frame);
+	lcd_update();
 	
 	return 0;
 }
