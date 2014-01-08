@@ -16,7 +16,7 @@ export LINUXDIR=$TOPDIR/linux-a10
 export ROOTFSDIR=$TOPDIR/em6000-root
 export TOOLSDIR=$TOPDIR/utils
 
-export SPLASH_FILE=$TOPDIR/simit-320x240-24bit.bmp
+export SPLASH_FILE=$TOOLSDIR/mksplash/THTF-128x128-24bit.bmp
 
 export MAKE_OPT=-j8
 
