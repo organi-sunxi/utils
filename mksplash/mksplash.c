@@ -398,9 +398,9 @@ int main(int argc, char* argv[])
 
 	if(fmt.bit==32)
 		fmt.bitmapto = rev ? bitmap32to24 : bitmap24to32;
-	else if(fmt.bit=16)
+	else if(fmt.bit==16)
 		fmt.bitmapto = rev ? bitmap16to24 : bitmap24to16;
-	else if(fmt.bit=24)
+	else if(fmt.bit==24)
 		fmt.bitmapto = rev ? bitmap24to24 : bitmap24to24;
 
 	if(!fmt.bitmapto){
