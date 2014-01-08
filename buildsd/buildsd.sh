@@ -103,7 +103,7 @@ cd mksplash
 make
 
 # splash.bin
-./mksplash -b32 $SPLASH_FILE
+./mksplash $SPLASH_FILE
 cp splash.bin $MOUNTDIR
 
 # packimg

@@ -16,7 +16,7 @@ export LINUXDIR=$TOPDIR/linux-sunxi
 export ROOTFSDIR=$TOPDIR/root/root-git
 export TOOLSDIR=$TOPDIR/utils
 
-SPLASH_FILE=$TOPDIR/simit-320x240-24bit.bmp
+SPLASH_FILE="-b32 $TOOLSDIR/mksplash/simit-320x240-24bit.bmp"
 
 MAKE_OPT=-j8
 
