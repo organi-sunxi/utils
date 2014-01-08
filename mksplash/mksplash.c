@@ -76,6 +76,12 @@ static int bitmap24to32(unsigned char *data, unsigned char *out)
 	return 4;
 }
 
+static int bitmap24to24(unsigned char *data, unsigned char *out)
+{
+	memcpy(out, data, 3);
+	return 3;
+}
+
 struct run_fmt{
 	int bit;
 	int	uimage;
@@ -394,6 +400,8 @@ int main(int argc, char* argv[])
 		fmt.bitmapto = rev ? bitmap32to24 : bitmap24to32;
 	else if(fmt.bit=16)
 		fmt.bitmapto = rev ? bitmap16to24 : bitmap24to16;
+	else if(fmt.bit=24)
+		fmt.bitmapto = rev ? bitmap24to24 : bitmap24to24;
 
 	if(!fmt.bitmapto){
 		printf("LCD bit only don't support %d\n", fmt.bit);
