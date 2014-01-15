@@ -121,7 +121,7 @@ if [ "$TARGET_SDCARD" = "true" ]
 then
 make CROSS_COMPILE=$UBOOT_CROSS_COMPILE distclean
 make CROSS_COMPILE=$UBOOT_CROSS_COMPILE $(BOARD_CAP)_MMC $MAKE_OPT
-make u-boot.img
+make CROSS_COMPILE=$UBOOT_CROSS_COMPILE u-boot.img
 sudo dd if=./spl/sunxi-spl.bin of=$TARGET bs=1024 seek=8
 sudo dd if=./u-boot.img of=$TARGET bs=1024 seek=32
 fi
