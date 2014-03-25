@@ -15,8 +15,13 @@
 
 #define LCD_INFO_NAME_SIZE	128
 
+#define LOCAL_LCD_MODE_TTL		0
+#define LOCAL_LCD_MODE_LVDS6	1
+#define LOCAL_LCD_MODE_LVDS8	2
+
 struct local_lcd_info{
 	char name[LCD_INFO_NAME_SIZE];
+	int mode;
 	struct fb_info info;
 };
 
@@ -34,7 +39,7 @@ static int match_em6000(const char *platform)
 		case C: (p)|=(v); (p)|=POL_VALID; break; \
 		case c: (p)&=~(v); (p)|=POL_VALID; break;
 
-static char *get_lcd_pol(char* str, enum fb_pol *pol)
+static char *get_lcd_pol(char* str, enum fb_pol *pol, int *mode)
 {
 	*pol = POL_DEFALT;
 
@@ -51,18 +56,31 @@ static char *get_lcd_pol(char* str, enum fb_pol *pol)
 			CASE_CHAR2VAL('P', 'p', POL_PCLK, *pol)
 			CASE_CHAR2VAL('H', 'h', POL_HS, *pol)
 			CASE_CHAR2VAL('V', 'v', POL_VS, *pol)
+			case 'L':
+				*mode = LOCAL_LCD_MODE_LVDS8;
+				break;
+			case 'l':
+				*mode = LOCAL_LCD_MODE_LVDS6;
+				break;
 		}
 		str++;
 	}
 	return str;
 }
 
-static int str2fbinfo(const char *buf, struct fb_info *fi)
+static int str2fbinfo(const char *buf, struct local_lcd_info *lcdinfo)
 {
 	int ret;
 	char suffix[128];
+	struct fb_info *fi=&lcdinfo->info;
+
+	lcdinfo->mode=LOCAL_LCD_MODE_TTL;
 	
-	//[width]x[height]@[PCLK(KHz)],[HFP]:[HSW]:[HBP],[VFP]:[VSW]:[VBP],BODPHV
+	/*
+		[width]x[height]@[PCLK(KHz)],[HFP]:[HSW]:[HBP],[VFP]:[VSW]:[VBP],BODPHV(L)
+																		L: 8bit lvds, l: 6bit lvds, none: TTL
+	*/
+	
 	ret = sscanf(buf, "%dx%d@%d,%d:%d:%d,%d:%d:%d%[^#]",
 		&fi->width, &fi->height, &fi->pclk, 
 		&fi->hfp, &fi->hsw, &fi->hbp,
@@ -73,7 +91,7 @@ static int str2fbinfo(const char *buf, struct fb_info *fi)
 	if(ret==9)
 		fi->pol=0;
 	else
-		get_lcd_pol(suffix, &fi->pol);
+		get_lcd_pol(suffix, &fi->pol, &lcdinfo->mode);
 
 	return 0;
 }
@@ -112,7 +130,7 @@ static int em6000_load_lcds(int *nlcd, struct local_lcd_info *lcdinfo, struct fb
 			continue;
 		p += n;
 
-		if(str2fbinfo(p, &lcdinfo->info)<0 || !fbinfo)
+		if(str2fbinfo(p, lcdinfo)<0 || !fbinfo)
 			continue;
 
 		v = lcdinfo->info.pclk >= fbinfo->pclk ? (lcdinfo->info.pclk - fbinfo->pclk) : 
@@ -149,13 +167,14 @@ static void output_lcdinfo(struct local_lcd_info *plcdinfo, FILE *f)
 
 	pol = plcdinfo->info.pol;
 	if(pol&POL_VALID){
-		snprintf(suffix, sizeof(suffix), ",%c%c%c%c%c%c", 
+		snprintf(suffix, sizeof(suffix), ",%c%c%c%c%c%c%s", 
 			(pol&POL_BL)?'B':'b',
 			(pol&POL_LCDONOFF)?'O':'o',
 			(pol&POL_DE)?'D':'d',
 			(pol&POL_PCLK)?'P':'p',
 			(pol&POL_HS)?'H':'h',
-			(pol&POL_VS)?'V':'v');
+			(pol&POL_VS)?'V':'v', 
+			(plcdinfo->mode==LOCAL_LCD_MODE_TTL)?"":(plcdinfo->mode==LOCAL_LCD_MODE_LVDS8)?"L":"l");
 	}
 	else{
 		suffix[0]=0;
@@ -333,7 +352,7 @@ static int unpackimg_out_cbk(struct unpackimg_out_t *pack, char out[], int n)
 #define AWK_INI_FILE_KEY(key)	"if($1==\""key"\")print $1\"=%d\";else "
 #define AWK_INI_FILE_END()	"print $0;next;}{print $0}\'"
 
-static int set_lcd_info(struct fb_info *fbinfo)
+static int set_lcd_info(struct fb_info *fbinfo, int mode)
 {
 	struct unpackimg_out_t pack;
 	const char *devnum = GET_CONF_VALUE(PACKIMG_DEVNUM);
@@ -370,12 +389,16 @@ static int set_lcd_info(struct fb_info *fbinfo)
 		AWK_INI_FILE_KEY("lcd_vt")
 		AWK_INI_FILE_KEY("lcd_hv_hspw")
 		AWK_INI_FILE_KEY("lcd_hv_vspw")
+		AWK_INI_FILE_KEY("lcd_if")
+		AWK_INI_FILE_KEY("lcd_lvds_bitwidth")
+		AWK_INI_FILE_KEY("lcd_frm")
 		AWK_INI_FILE_END()
 		"|fex2bin > %stmp",
 		pack.filename, 
 		fbinfo->width, fbinfo->height, (fbinfo->pclk+500)/1000, 
 		fbinfo->hbp+fbinfo->hsw, ht, 
 		fbinfo->vbp+fbinfo->vsw, vt, fbinfo->hsw, fbinfo->vsw,
+		(mode==LOCAL_LCD_MODE_TTL)?0:3,(mode==LOCAL_LCD_MODE_LVDS8)?0:1,(mode==LOCAL_LCD_MODE_TTL)?0:1,
 		pack.filename)<0){
 		return -1;
 	}
@@ -470,7 +493,7 @@ static void em6000_set_lcd(int argc, char *argv[])
 			FAILED_OUT("out of lcd list range");
 			goto out;
 		}
-		if(set_lcd_info(&plcdinfo[i].info)<0)
+		if(set_lcd_info(&plcdinfo[i].info, plcdinfo[i].mode)<0)
 			goto out;
 		SUCESS_OUT();
 		goto out;

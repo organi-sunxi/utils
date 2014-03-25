@@ -19,10 +19,10 @@ emconfig:$(OBJ)
 
 defaultenv.h:emconfig.conf
 	echo "#ifndef DEFAULTENV_H" > $@
-	echo -e "#define DEFAULTENV_H\n" >> $@
-	echo -e "//This file is generated form emconfig.conf. don't edit it!\n" >> $@
+	echo "#define DEFAULTENV_H\n" >> $@
+	echo "//This file is generated form emconfig.conf. don't edit it!\n" >> $@
 	sed /^[[:space:]]*$$/d emconfig.conf | sed '/#/d' | sed 's/=/\t\t\"/' | sed 's/^/#define &/g' | sed 's/$$/\"/g' >> $@
-	echo -e "\n#endif" >> $@
+	echo "\n#endif" >> $@
 
 clean:
 	rm -f *.o defaultenv.h *.dep
