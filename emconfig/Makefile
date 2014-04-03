@@ -1,4 +1,4 @@
-CC:=arm-none-linux-gnueabi-
+CC?=arm-none-linux-gnueabi-
 SRC=main.c command.c operator_lib.c operator_machine.c operator_app.c lib.c \
 	em5000.c em6000.c
 
