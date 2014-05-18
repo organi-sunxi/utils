@@ -120,17 +120,18 @@ cd $UBOOTDIR
 if [ "$TARGET_SDCARD" = "true" ]
 then
 make CROSS_COMPILE=$UBOOT_CROSS_COMPILE distclean
-make CROSS_COMPILE=$UBOOT_CROSS_COMPILE $(BOARD_CAP)_MMC $MAKE_OPT
+make CROSS_COMPILE=$UBOOT_CROSS_COMPILE ${BOARD_CAP}_MMC_config
+make CROSS_COMPILE=$UBOOT_CROSS_COMPILE $MAKE_OPT
 make CROSS_COMPILE=$UBOOT_CROSS_COMPILE u-boot.img
-sudo dd if=./spl/sunxi-spl.bin of=$TARGET bs=1024 seek=8
-sudo dd if=./u-boot.img of=$TARGET bs=1024 seek=32
+sudo dd if=./u-boot-sunxi-with-spl.bin of=$TARGET bs=1024 seek=8
 fi
 
 # NAND uboot
 if [ "$TARGET_UBOOT" = "true" ]
 then
 make CROSS_COMPILE=$UBOOT_CROSS_COMPILE distclean
-make CROSS_COMPILE=$UBOOT_CROSS_COMPILE $BOARD_CAP $MAKE_OPT
+make CROSS_COMPILE=$UBOOT_CROSS_COMPILE ${BOARD_CAP}_config
+make CROSS_COMPILE=$UBOOT_CROSS_COMPILE $MAKE_OPT
 
 # sunxi-spl.bin & u-boot.bin
 cp spl/sunxi-spl.bin $MOUNTDIR
