@@ -392,6 +392,7 @@ static int set_lcd_info(struct fb_info *fbinfo, int mode)
 		AWK_INI_FILE_KEY("lcd_if")
 		AWK_INI_FILE_KEY("lcd_lvds_bitwidth")
 		AWK_INI_FILE_KEY("lcd_frm")
+		AWK_INI_FILE_KEY("lcd_io_cfg0")
 		AWK_INI_FILE_END()
 		"|fex2bin > %stmp",
 		pack.filename, 
@@ -399,6 +400,7 @@ static int set_lcd_info(struct fb_info *fbinfo, int mode)
 		fbinfo->hbp+fbinfo->hsw, ht, 
 		fbinfo->vbp+fbinfo->vsw, vt, fbinfo->hsw, fbinfo->vsw,
 		(mode==LOCAL_LCD_MODE_TTL)?0:3,(mode==LOCAL_LCD_MODE_LVDS8)?0:1,(mode==LOCAL_LCD_MODE_TTL)?0:1,
+		(fbinfo->pol & POL_PCLK)?0:0x10000000,
 		pack.filename)<0){
 		return -1;
 	}
