@@ -37,7 +37,7 @@
 //#define LOGTIME
 
 #define DEFAULT_FB_DEVICE	"/dev/fb0"
-#define VIDEO_CHANNEL_NUM	2
+#define VIDEO_CHANNEL_NUM	4
 
 //#define DEBUG
 #ifdef DEBUG
@@ -241,11 +241,11 @@ static int initCapture(const char *dev, struct video_dev *pvdev)
 	//set position and auto calculate size
 	memset(&fmt, 0, sizeof(fmt));
 	fmt.type = V4L2_BUF_TYPE_PRIVATE;
-	fmt.fmt.raw_data[0] =0;//interface
+	fmt.fmt.raw_data[0] =0;//interface, 0=composite, 1=ypbpr
 	fmt.fmt.raw_data[1] =VIN_SYSTEM;//system, 1=pal, 0=ntsc
 	fmt.fmt.raw_data[8] =VIN_ROW_NUM;//row
 	fmt.fmt.raw_data[9] =VIN_COL_NUM;//column
-	fmt.fmt.raw_data[10] =1;//channel_index
+	fmt.fmt.raw_data[10] =pvdev->channel+1;//channel_index from 1
 	fmt.fmt.raw_data[11] =0;//channel_index
 	fmt.fmt.raw_data[12] =0;//channel_index
 	fmt.fmt.raw_data[13] =0;//channel_index
