@@ -1,12 +1,13 @@
 /*
  * video.c
  *
- *  Copyright (C) 2007, UP-TECH Corporation
+ *	Copyright (C) 2007, UP-TECH Corporation
  *
  *
  */
 
 #include <stdio.h>
+#include <stdint.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
@@ -21,10 +22,17 @@
 
 #include <linux/fb.h>
 #include <linux/videodev2.h>
-#include <linux/videodev2.h>
 
 #include "mon-server.h"
 #include "video.h"
+#include <video/sunxi_disp_ioctl.h>
+
+#define VIN_SYSTEM_NTSC	0
+#define VIN_SYSTEM_PAL	1
+
+#define VIN_ROW_NUM	1
+#define VIN_COL_NUM	1
+#define VIN_SYSTEM	VIN_SYSTEM_PAL
 
 //#define LOGTIME
 
@@ -51,60 +59,42 @@ struct buf_info{
 	char *start;
 };
 
-static unsigned char alaw_mapping_table[256] = {
-	0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x02, 0x02, 0x02, 0x02, 0x03, 0x03, 0x03, 0x03,
-	0x04, 0x04, 0x04, 0x04, 0x05, 0x05, 0x05, 0x05, 0x06, 0x06, 0x06, 0x06, 0x07, 0x07, 0x07, 0x07,
-	0x08, 0x08, 0x08, 0x08, 0x09, 0x09, 0x09, 0x09, 0x0A, 0x0A, 0x0A, 0x0A, 0x0B, 0x0B, 0x0B, 0x0B,
-	0x0C, 0x0C, 0x0C, 0x0C, 0x0D, 0x0D, 0x0D, 0x0D, 0x0E, 0x0E, 0x0E, 0x0E, 0x0F, 0x0F, 0x0F, 0x0F,
-	0x10, 0x10, 0x10, 0x10, 0x11, 0x11, 0x11, 0x11, 0x12, 0x12, 0x12, 0x12, 0x13, 0x13, 0x13, 0x14,
-	0x14, 0x14, 0x14, 0x14, 0x15, 0x15, 0x16, 0x16, 0x16, 0x17, 0x17, 0x17, 0x18, 0x18, 0x18, 0x19,
-	0x19, 0x19, 0x1A, 0x1A, 0x1A, 0x1B, 0x1B, 0x1C, 0x1C, 0x1C, 0x1D, 0x1D, 0x1E, 0x1E, 0x1F, 0x1F,
-	0x20, 0x20, 0x21, 0x21, 0x22, 0x22, 0x23, 0x23, 0x24, 0x24, 0x25, 0x25, 0x26, 0x26, 0x27, 0x27,
-	0x28, 0x28, 0x29, 0x29, 0x2A, 0x2B, 0x2C, 0x2C, 0x2D, 0x2E, 0x2E, 0x2F, 0x30, 0x30, 0x31, 0x31,
-	0x32, 0x33, 0x34, 0x34, 0x35, 0x36, 0x37, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3D, 0x3E,
-	0x3F, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E,
-	0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x5A, 0x5C, 0x5D, 0x5F, 0x60, 0x61, 0x63,
-	0x64, 0x66, 0x67, 0x69, 0x6A, 0x6B, 0x6D, 0x6F, 0x70, 0x72, 0x74, 0x75, 0x77, 0x79, 0x7A, 0x7C,
-	0x7E, 0x80, 0x82, 0x84, 0x86, 0x88, 0x8A, 0x8B, 0x8D, 0x90, 0x92, 0x94, 0x96, 0x98, 0x9A, 0x9B,
-	0x9F, 0xA1, 0xA3, 0xA6, 0xA8, 0xAB, 0xAD, 0xB0, 0xB2, 0xB5, 0xB7, 0xBA, 0xBD, 0xC0, 0xC2, 0xC5,
-	0xC8, 0xCB, 0xCE, 0xD1, 0xD4, 0xD6, 0xDA, 0xDD, 0xE0, 0xE3, 0xE6, 0xE9, 0xEC, 0xF0, 0xF4, 0xFA,
-};
-
-#define CAPTURE_MAX_BUFFER		3
-#define DISPLAY_MAX_BUFFER		3
+#define CAPTURE_MAX_BUFFER		4
 
 /* device to be used for capture */
-#define CAPTURE_DEVICE		"/dev/video0"
+#define CAPTURE_DEVICE		"/dev/video1"
 #define CAPTURE_NAME		"Capture"
 /* device to be used for display */
-#define DISPLAY_DEVICE		"/dev/video1"
-#define DISPLAY_NAME		"Display"
+#define DISPLAYCTRL_DEVICE		"/dev/disp"
+#define DISPLAYCTRL_NAME		"Display ctrl"
 
-#define DEF_PIX_FMT		V4L2_PIX_FMT_UYVY
-
-#define IMG_WIDTH 720
-#define IMG_HEIGHT 576
+#define DEF_PIX_FMT		V4L2_PIX_FMT_YUV420	//V4L2_PIX_FMT_NV12
 
 struct display_dev
 {
 	int fd;	//for frame buffer overlayer device
-	unsigned int xpos, ypos, xres, yres;
-	unsigned int width, height;	//input buffer
-	struct{unsigned int x,y;}pix_step_mod;	//pixel step mod, 1<<pix_step_mod == pre-resize buffer
+	rect_st scrn;
+	rect_st crop;
 
-	struct v4l2_buffer display_buf;
-	struct buf_info buff_info[DISPLAY_MAX_BUFFER];
-	int numbuffer;
+	unsigned int hlay;
+	int scn_index;//which screen 0/1
 };
 
-static struct display_dev fboverlydev={.fd=-1,};
+struct fb_info
+{
+	int fb_width, fb_height, fb_line_len, fb_size;
+	int fb_bpp;
+};
+static struct fb_info fbinfo;
+
+static struct display_dev dispdev={.fd=-1,};
 
 struct video_dev
 {
 	int fd;	//for video device
-	rect_st crop;
-	unsigned long bytesperline;
 	int channel;
+	unsigned int offset[2];	//capture data C offset
+	int cap_width, cap_height;
 
 	struct v4l2_buffer capture_buf;
 	struct buf_info buff_info[CAPTURE_MAX_BUFFER];
@@ -112,6 +102,56 @@ struct video_dev
 
 };
 static struct video_dev videodev={.fd=-1, };
+
+static int rect_and(Prect_st win, Prect_st bound)
+{
+	unsigned int left, top, right, down;
+	
+	left = max(win->x, bound->x);
+	top = max(win->y, bound->y);
+	right = min(win->x+win->width, bound->x+bound->width);
+	down = min(win->y+win->height, bound->y+bound->height);
+
+	if(left>=right || top>=down){
+		LOG("invalid rect\n");
+		return -1;
+	}
+
+	if(win->x != left || win->y!=top || 
+		win->width != right-left || win->height != down-top){
+		win->x = left;
+		win->y = top;
+		win->width = right-left;
+		win->height = down-top;
+		LOG("regulate crop: (%d,%d)-%dx%d\n", 
+			win->x, win->y, win->width, win->height);
+	}
+
+	return 0;
+}
+
+static void disp_start(struct display_dev *pddev)
+{
+	unsigned long arg[4];
+	arg[0] = pddev->scn_index;
+	arg[1] = pddev->hlay;
+	ioctl(pddev->fd, DISP_CMD_VIDEO_START,	(void*)arg);
+}
+
+static void disp_stop(struct display_dev *pddev)
+{
+	unsigned long arg[4];
+	arg[0] = pddev->scn_index;
+	arg[1] = pddev->hlay;
+	ioctl(pddev->fd, DISP_CMD_VIDEO_STOP,  (void*)arg);
+}
+
+static int disp_on(struct display_dev *pddev)
+{
+	unsigned long arg[4];
+	arg[0] = 0;
+	return ioctl(pddev->fd, DISP_CMD_LCD_ON, (void*)arg);
+}
 
 static void video_close(struct video_dev *pvdev)
 {
@@ -133,48 +173,28 @@ static void video_close(struct video_dev *pvdev)
 	}
 }
 
-static void display_close(struct display_dev *pfbdev)
+static void display_close(struct display_dev *pddev)
 {
-	int i;
-	struct buf_info *buff_info;
+	unsigned long arg[4];
 
-	/* Un-map the buffers */
-	for (i = 0; i < DISPLAY_MAX_BUFFER; i++){
-		buff_info = &pfbdev->buff_info[i];
-		if(buff_info->start){
-			munmap(buff_info->start, buff_info->length);
-			buff_info->start = NULL;
-		}
-	}
+	disp_stop(pddev);
 
-	if (pfbdev->fd >= 0){
-		close(pfbdev->fd);
-		pfbdev->fd = -1;
+//	arg[0] = 0;
+//	ioctl(pddev->fd, DISP_CMD_LCD_OFF, (void*)arg);
+
+	arg[0] = pddev->scn_index;
+	arg[1] = pddev->hlay;
+	ioctl(pddev->fd, DISP_CMD_LAYER_CLOSE,	(void*)arg);
+
+	arg[0] = pddev->scn_index;
+	arg[1] = pddev->hlay;
+	ioctl(pddev->fd, DISP_CMD_LAYER_RELEASE,  (void*)arg);
+
+	if (pddev->fd >= 0){
+		close(pddev->fd);
+		pddev->fd = -1;
 	}
 }
-
-static int regulate_crop(Prect_st win, Prect_st bound)
-{
-	unsigned int left, top, right, down;
-	
-	left = max(win->x, bound->x);
-	top = max(win->y, bound->y);
-	right = min(win->x+win->width, bound->x+bound->width);
-	down = min(win->y+win->height, bound->y+bound->height);
-
-	if(left>=right || top>=down){
-		LOG("invalid crop\n");
-		return -1;
-	}
-
-	win->x = left;
-	win->y = top;
-	win->width = right-left;
-	win->height = down-top;
-
-	return 0;
-}
-
 
 /*===============================initCapture==================================*/
 /* This function initializes capture device. It selects an active input
@@ -188,99 +208,21 @@ static int initCapture(const char *dev, struct video_dev *pvdev)
 	struct v4l2_cropcap cropcap;
 	struct v4l2_crop crop;
 
-	int ret, i;
+	int ret, i, w, h;
 	struct v4l2_requestbuffers reqbuf;
 	struct v4l2_buffer buf;
 	struct v4l2_capability capability;
-	struct v4l2_input input;
-	v4l2_std_id std_id;
-	struct v4l2_standard standard;
-	int index;
-	Prect_st pvcrop =&pvdev->crop;
 
 	/* Open the capture device */
-	fd  = open(dev, O_RDWR);
-	if (fd  <= 0) {
+	fd	= open(dev, O_RDWR);
+	DPRINTF("%s, %d\n", __FUNCTION__, __LINE__);
+
+	if (fd	<= 0) {
+		DPRINTF("%s, %d\n", __FUNCTION__, __LINE__);
 		LOG("Cannot open = %s device\n", CAPTURE_DEVICE);
 		return -1;
 	}
 	pvdev->fd = fd;
-
-	/* Get any active input */
-	if (ioctl(fd, VIDIOC_G_INPUT, &index) < 0) {
-		LOG("VIDIOC_G_INPUT error\n");
-		goto ERROR;
-	}
-
-	/* Enumerate input to get the name of the input detected */
-	memset(&input, 0, sizeof(input));
-	input.index = index;
-	if (ioctl(fd, VIDIOC_ENUMINPUT, &input) < 0) {
-		LOG("VIDIOC_ENUMINPUT error\n");
-		goto ERROR;
-	}
-
-	LOG("%s: Current Input: %s\n", CAPTURE_NAME, input.name);
-
-	index = pvdev->channel;
-
-	if (ioctl(fd, VIDIOC_S_INPUT, &index) < 0) {
-		LOG("VIDIOC_S_INPUT error\n");
-		goto ERROR;
-	}
-	memset(&input, 0, sizeof(input));
-	input.index = index;
-	if (ioctl(fd, VIDIOC_ENUMINPUT, &input) < 0) {
-		LOG("VIDIOC_ENUMINPUT error\n");
-		goto ERROR;
-	}
-	LOG("%s: Input changed to: %s\n", CAPTURE_NAME,
-						 input.name);
-
-	/* Store the name of the output as per the input detected */
-//	strcpy(inputname, (char*)input.name);
-
-	/* Detect the standard in the input detected */
-	pthread_testcancel();
-	while(ioctl(fd, VIDIOC_QUERYSTD, &std_id)<0){
-		pthread_testcancel();
-		LOG("VIDIOC_QUERYSTD error\n");
-		sleep(1);
-		if (ioctl(fd, VIDIOC_S_INPUT, &index) < 0) {
-			LOG("VIDIOC_S_INPUT error\n");
-		}
-	}
-	/* Set the standard*/
-	if (ioctl(fd, VIDIOC_S_STD, &std_id) < 0) {
-		LOG("VIDIOC_S_STD error\n");
-		goto ERROR;
-	}
-
-	/* Get the standard*/
-	if (ioctl(fd, VIDIOC_G_STD, &std_id) < 0) {
-		/* Note when VIDIOC_ENUMSTD always returns EINVAL this
-		   is no video device or it falls under the USB exception,
-		   and VIDIOC_G_STD returning EINVAL is no error. */
-		LOG("VIDIOC_G_STD error\n");
-		goto ERROR;
-	}
-	memset(&standard, 0, sizeof(standard));
-	standard.index = 0;
-	while (1) {
-		if (ioctl(fd, VIDIOC_ENUMSTD, &standard) < 0) {
-			LOG("VIDIOC_ENUMSTD error\n");
-			goto ERROR;
-		}
-
-		/* Store the name of the standard */
-		if (standard.id & std_id) {
-		//	strcpy(stdname, (char*)standard.name);
-			LOG("%s: Current standard: %s\n",
-					CAPTURE_NAME, standard.name);
-			break;
-		}
-		standard.index++;
-	}
 
 	/* Check if the device is capable of streaming */
 	if (ioctl(fd, VIDIOC_QUERYCAP, &capability) < 0) {
@@ -296,51 +238,24 @@ static int initCapture(const char *dev, struct video_dev *pvdev)
 		goto ERROR;
 	}
 
-	//get default crop size
-	cropcap.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	ret = ioctl(fd, VIDIOC_CROPCAP, &cropcap);
-	if (ret < 0) {
-		LOG("VIDIOC_CROPCAP error\n");
-		goto ERROR;
+	//set position and auto calculate size
+	memset(&fmt, 0, sizeof(fmt));
+	fmt.type = V4L2_BUF_TYPE_PRIVATE;
+	fmt.fmt.raw_data[0] =0;//interface
+	fmt.fmt.raw_data[1] =VIN_SYSTEM;//system, 1=pal, 0=ntsc
+	fmt.fmt.raw_data[8] =VIN_ROW_NUM;//row
+	fmt.fmt.raw_data[9] =VIN_COL_NUM;//column
+	fmt.fmt.raw_data[10] =1;//channel_index
+	fmt.fmt.raw_data[11] =0;//channel_index
+	fmt.fmt.raw_data[12] =0;//channel_index
+	fmt.fmt.raw_data[13] =0;//channel_index
+	if (-1 == ioctl (fd, VIDIOC_S_FMT, &fmt)){
+		LOG("VIDIOC_S_FMT error!\n");
+		return -1; 
 	}
 
-	if(pvcrop->x==0 && pvcrop->y==0 && pvcrop->width==0 && pvcrop->height==0){
-		memcpy(pvcrop, &cropcap.defrect, sizeof(*pvcrop));
-	}
-
-	ret = regulate_crop(&pvdev->crop, (Prect_st)&cropcap.defrect);
-	if(ret < 0)
-		goto ERROR;
-
-	crop.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	crop.c.left = pvdev->crop.x;
-	crop.c.top = pvdev->crop.y;
-	crop.c.width = pvdev->crop.width;
-	crop.c.height = pvdev->crop.height;
-	ret = ioctl(fd, VIDIOC_S_CROP, &crop);
-	if (ret < 0) {
-		LOG("VIDIOC_S_CROP error, %d %d %d %d\n", crop.c.left, crop.c.top, crop.c.width, crop.c.height);
-		goto ERROR;
-	}
-
+	memset(&fmt, 0, sizeof(fmt));
 	fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	ret = ioctl(fd, VIDIOC_G_FMT, &fmt);
-	if (ret < 0) {
-		LOG("VIDIOC_G_FMT error\n");
-		goto ERROR;
-	}
-
-	fmt.fmt.pix.width = pvcrop->width;
-	fmt.fmt.pix.height = pvcrop->height;
-	fmt.fmt.pix.pixelformat = DEF_PIX_FMT;
-	pvdev->bytesperline = fmt.fmt.pix.bytesperline;
-
-	fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	ret = ioctl(fd, VIDIOC_S_FMT, &fmt);
-	if (ret < 0) {
-		LOG("VIDIOC_S_FMT error\n");
-		goto ERROR;
-	}
 
 	ret = ioctl(fd, VIDIOC_G_FMT, &fmt);
 	if (ret < 0) {
@@ -348,13 +263,39 @@ static int initCapture(const char *dev, struct video_dev *pvdev)
 		goto ERROR;
 	}
 
-	if (fmt.fmt.pix.pixelformat != DEF_PIX_FMT) {
-		LOG("%s: Requested pixel format not supported\n",
-				CAPTURE_NAME);
-		goto ERROR;
+	w = pvdev->cap_width = fmt.fmt.pix.width;
+	h = pvdev->cap_height = fmt.fmt.pix.height;
+	pvdev->offset[0] = w * h;
+
+	switch(fmt.fmt.pix.pixelformat){
+	case V4L2_PIX_FMT_YUV422P:
+	case V4L2_PIX_FMT_YUYV:
+	case V4L2_PIX_FMT_YVYU:
+	case V4L2_PIX_FMT_UYVY:
+	case V4L2_PIX_FMT_VYUY:
+		pvdev->offset[1] = w*h*3/2;
+		break;
+	case V4L2_PIX_FMT_YUV420:
+		pvdev->offset[1] = w*h*5/4;
+		break;
+	case V4L2_PIX_FMT_NV16:
+	case V4L2_PIX_FMT_NV12:
+	case V4L2_PIX_FMT_HM12:
+		pvdev->offset[1] = pvdev->offset[0];
+		break;
+
+	default:
+		LOG("csi_format is not found!\n");
+		break;
+
 	}
 
-	LOG("Capture %dx%d\n", pvcrop->width, pvcrop->height);
+	LOG("cap size %d x %d offset: %x, %x\n", 
+		fmt.fmt.pix.width, fmt.fmt.pix.height, pvdev->offset[0], pvdev->offset[1]);
+	if(dispdev.crop.x==0 && dispdev.crop.y==0 && dispdev.crop.width==0 && dispdev.crop.height==0){
+		dispdev.crop.width = fmt.fmt.pix.width;
+		dispdev.crop.height = fmt.fmt.pix.height;
+	}
 
 	/* Buffer allocation
 	 * Buffer can be allocated either from capture driver or
@@ -432,216 +373,104 @@ ERROR:
 	return -1;
 }
 
-/*
-	display output buffer width and height must be 0.5*in <= out < 8*in
-	return in>>*step_mode
-*/
-static int normal_out_step(unsigned int in, unsigned int out, unsigned int *step_mod)
-{
-	*step_mod=0;
-	if(out==0)
-		return out;
-
-	while(out<(in>>1)){
-		(*step_mod)++;
-		in>>=1;
-	}
-
-	return in;
-}
-
 /*===============================initDisplay==================================*/
 /* This function initializes display device. It sets output and standard for
  * LCD. These output and standard are same as those detected in capture device.
  * It, then, allocates buffers in the driver's memory space and mmaps them in
  * the application space */
-static int initDisplay(const char *dev, struct display_dev *pddev)
+static int initDisplay(const char *dev, struct display_dev *pddev, struct video_dev *pvdev)
 {
 	int fd;
-	struct v4l2_format fmt;
-				
-	int ret, i;
-	struct v4l2_requestbuffers reqbuf;
-	struct v4l2_buffer buf;
-	struct v4l2_capability capability;
-	struct v4l2_control control;
+	unsigned int hlay;
+	unsigned long arg[4];
+	int fb_fd;
+	unsigned long fb_layer;
+	__disp_layer_info_t layer_para;
+	rect_st bound={.x=0, .y=0, .width=pvdev->cap_width, .height=pvdev->cap_height};
+
+	pddev->scn_index = 0;
+
+	if(rect_and(&pddev->crop, &bound)<0)
+		return -1;
 
 	/* Open the video display device */
 	fd = open(dev, O_RDWR);
 	if (fd < 0) {
-		LOG("Cannot open = %s device\n", DISPLAY_DEVICE);
+		LOG("Cannot open = %s device\n", DISPLAYCTRL_DEVICE);
 		return -1;
 	}
-	LOG("\n%s: Opened Channel\n", DISPLAY_NAME);
+	LOG("\n%s: Opened\n", DISPLAYCTRL_DEVICE);
 	pddev->fd = fd;
 
-	/* Check if the device is capable of streaming */
-	if (ioctl(fd, VIDIOC_QUERYCAP, &capability) < 0) {
-		LOG("VIDIOC_QUERYCAP error\n");
+	arg[0] = 0;
+	ioctl(fd, DISP_CMD_LCD_ON, (void*)arg);
+
+	//layer0
+	arg[0] = 0;
+	arg[1] = DISP_LAYER_WORK_MODE_SCALER;
+	hlay = ioctl(fd, DISP_CMD_LAYER_REQUEST, (void*)arg);
+	if(hlay == 0)
+	{
+		LOG("request layer0 fail\n");
 		goto ERROR;
 	}
+	LOG("video layer hdl:%d\n", hlay);
+	pddev->hlay = hlay;
 
-	if (capability.capabilities & V4L2_CAP_STREAMING){
-		LOG("%s: Capable of streaming\n", DISPLAY_NAME);
-	}
-	else {
-		LOG("%s: Not capable of streaming\n", DISPLAY_NAME);
-		goto ERROR;
-	}
+	layer_para.mode = DISP_LAYER_WORK_MODE_SCALER;
+	layer_para.pipe = 0;
+	layer_para.fb.addr[0] = 0;//your Y address,modify this
+	layer_para.fb.addr[1] = pvdev->offset[0]; //your C address,modify this
+	layer_para.fb.addr[2] = pvdev->offset[1];
+	layer_para.fb.size.width    = pvdev->cap_width;
+	layer_para.fb.size.height   = pvdev->cap_height;
+	layer_para.fb.mode		   = DISP_MOD_NON_MB_UV_COMBINED;//DISP_MOD_INTERLEAVED;//DISP_MOD_NON_MB_PLANAR;//DISP_MOD_NON_MB_UV_COMBINED;
+	layer_para.fb.format 	   = DISP_FORMAT_YUV420;//DISP_FORMAT_YUV422;//DISP_FORMAT_YUV420;
+	layer_para.fb.br_swap	   = 0;
+	layer_para.fb.seq		   = DISP_SEQ_UVUV;//DISP_SEQ_UVUV;//DISP_SEQ_YUYV;//DISP_SEQ_YVYU;//DISP_SEQ_UYVY;//DISP_SEQ_VYUY//DISP_SEQ_UVUV
+	layer_para.ck_enable 	   = 0;
+	layer_para.alpha_en		   = 1;
+	layer_para.alpha_val 	   = 0xff;
+	layer_para.src_win.x 	   = pddev->crop.x;
+	layer_para.src_win.y 	   = pddev->crop.y;
+	layer_para.src_win.width    = pddev->crop.width;
+	layer_para.src_win.height   = pddev->crop.height;
+	layer_para.scn_win.x 	   = pddev->scrn.x;
+	layer_para.scn_win.y 	   = pddev->scrn.y;
+	layer_para.scn_win.width    = pddev->scrn.width;
+	layer_para.scn_win.height   = pddev->scrn.height;
+	arg[0] = pddev->scn_index;
+	arg[1] = hlay;
+	arg[2] = (unsigned long)&layer_para;
+	ioctl(fd,DISP_CMD_LAYER_SET_PARA,(void*)arg);
+#if 0
+	arg[0] = pddev->scn_index;
+	arg[1] = hlay;
+	ioctl(disphd,DISP_CMD_LAYER_TOP,(void*)arg);
+#endif
+	arg[0] = pddev->scn_index;
+	arg[1] = hlay;
+	ioctl(fd,DISP_CMD_LAYER_OPEN,(void*)arg);
 
-	/* Rotate by 90 degree so that 480x640 resolution will become 640x480 */
-	control.id = V4L2_CID_ROTATE;
-	control.value = 0;
-	ret = ioctl(fd, VIDIOC_S_CTRL, &control);
-	if (ret < 0) {
-		LOG("VIDIOC_S_CTRL error\n");
-		goto ERROR;
-	}
-
-	/* Get the format */
-	fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
-	ret = ioctl(fd, VIDIOC_G_FMT, &fmt);
-	if (ret < 0) {
-		LOG("VIDIOC_G_FMT error\n");
-		goto ERROR;
-	}
-
-	pddev->width = fmt.fmt.pix.width = 
-		normal_out_step(videodev.crop.width, pddev->xres, &pddev->pix_step_mod.x);
-
-	pddev->height = fmt.fmt.pix.height = 
-		normal_out_step(videodev.crop.height, pddev->yres, &pddev->pix_step_mod.y);
-	fmt.fmt.pix.pixelformat = DEF_PIX_FMT;
-
-	LOG("Display in buffer=%dx%d, step=%dx%d\n", 
-		pddev->width, pddev->height, pddev->pix_step_mod.x, pddev->pix_step_mod.y);
-
-	fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
-	ret = ioctl(fd, VIDIOC_S_FMT, &fmt);
-	if (ret < 0) {
-		LOG("VIDIOC_S_FMT error\n");
-		goto ERROR;
-	}
-
-	ret = ioctl(fd, VIDIOC_G_FMT, &fmt);
-	if (ret < 0) {
-		LOG("VIDIOC_G_FMT error\n");
-		goto ERROR;
+#if 1
+	fb_fd = open(DEFAULT_FB_DEVICE, O_RDWR);
+	if (ioctl(fb_fd, FBIOGET_LAYER_HDL_0, &fb_layer) == -1) {
+		LOG("get fb layer handel\n");
 	}
 
-	if (fmt.fmt.pix.pixelformat != DEF_PIX_FMT) {
-		LOG("%s: Requested pixel format not supported\n",
-				CAPTURE_NAME);
-		goto ERROR;
-	}
+	arg[0] = 0;
+	arg[1] = fb_layer;
+	ioctl(fd, DISP_CMD_LAYER_BOTTOM, (void *)arg);
 
-	/* Get the parameters before setting and
-	 * set only required parameters */
-	fmt.type = V4L2_BUF_TYPE_VIDEO_OVERLAY;
-	ret = ioctl(fd, VIDIOC_G_FMT, &fmt);
-	if(ret<0) {
-		LOG("Set Format failed\n");
-		goto ERROR;
-	}
-	fmt.fmt.win.w.left = pddev->xpos;
-	fmt.fmt.win.w.top = pddev->ypos;
-	fmt.fmt.win.w.width = pddev->xres;
-	fmt.fmt.win.w.height = pddev->yres;
-	ret = ioctl(fd, VIDIOC_S_FMT, &fmt);
-	if(ret<0) {
-		LOG("Set Format failed\n");
-		goto ERROR;
-	}
-
-	/* Buffer allocation
-	 * Buffer can be allocated either from capture driver or
-	 * user pointer can be used
-	 */
-	/* Request for MAX_BUFFER input buffers. As far as Physically contiguous
-	 * memory is available, driver can allocate as many buffers as
-	 * possible. If memory is not available, it returns number of
-	 * buffers it has allocated in count member of reqbuf.
-	 * HERE count = number of buffer to be allocated.
-	 * type = type of device for which buffers are to be allocated.
-	 * memory = type of the buffers requested i.e. driver allocated or
-	 * user pointer */
-	reqbuf.count = DISPLAY_MAX_BUFFER;
-	reqbuf.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
-	reqbuf.memory = V4L2_MEMORY_MMAP;
-	ret = ioctl(fd, VIDIOC_REQBUFS, &reqbuf);
-	if (ret < 0) {
-		LOG("Cannot allocate memory\n");
-		goto ERROR;
-	}
-	/* Store the numbfer of buffers allocated */
-	
-	pddev->numbuffer = reqbuf.count;
-	if(pddev->numbuffer>DISPLAY_MAX_BUFFER){
-		LOG("%s: number of buffer(%d) over %d\n", DISPLAY_NAME, pddev->numbuffer, DISPLAY_MAX_BUFFER);
-		goto ERROR;
-	}
-		
-	LOG("%s: Number of requested buffers = %d\n", DISPLAY_NAME, pddev->numbuffer);
-
-	memset(&buf, 0, sizeof(buf));
-
-	/* Mmap the buffers
-	 * To access driver allocated buffer in application space, they have
-	 * to be mmapped in the application space using mmap system call */
-	for (i = 0; i < pddev->numbuffer; i++) {
-		/* Query physical address of the buffers */
-		buf.type = reqbuf.type;
-		buf.index = i;
-		buf.memory = reqbuf.memory;
-		ret = ioctl(fd, VIDIOC_QUERYBUF, &buf);
-		if (ret < 0) {
-			LOG("VIDIOC_QUERYCAP error\n");
-			(pddev->numbuffer) = i;
-			goto ERROR;
-		}
-
-		/* Mmap the buffers in application space */
-		pddev->buff_info[i].length = buf.length;
-		pddev->buff_info[i].index =  i;
-		pddev->buff_info[i].start = mmap(NULL, buf.length,
-				PROT_READ | PROT_WRITE, MAP_SHARED, fd,
-				buf.m.offset);
-
-		if (pddev->buff_info[i].start == MAP_FAILED) {
-			LOG("Cannot mmap = %d buffer\n", i);
-			pddev->numbuffer = i;
-			goto ERROR;
-		}
-		memset((void *) pddev->buff_info[i].start, 0x80,
-				pddev->buff_info[i].length);
-
-		/* Enqueue buffers
-		 * Before starting streaming, all the buffers needs to be
-		 * en-queued in the driver incoming queue. These buffers will
-		 * be used by thedrive for storing captured frames. */
-		ret = ioctl(fd, VIDIOC_QBUF, &buf);
-		if (ret < 0) {
-			LOG("VIDIOC_QBUF error\n");
-			pddev->numbuffer = i + 1;
-			goto ERROR;
-		}
-	}
-
-	LOG("%s: Init done successfully\n\n", DISPLAY_NAME);
+	disp_start(pddev);
 	return 0;
+#endif
 
 ERROR:
 	display_close(pddev);
 
 	return -1;
 }
-
-struct fb_info
-{
-	int fb_width, fb_height, fb_line_len, fb_size;
-	int fb_bpp;
-};
-static struct fb_info fbinfo;
 
 static int Getfb_info(char *dev)
 {
@@ -681,14 +510,31 @@ static int Getfb_info(char *dev)
 	DPRINTF("frame buffer: %d(%d)x%d,  %dbpp, 0x%xbyte\n", 
 		fbinfo.fb_width, fbinfo.fb_line_len, fbinfo.fb_height, fbinfo.fb_bpp, fbinfo.fb_size);
 		
-/*	if(fbinfo.fb_bpp!=16){
-		DPRINTF("frame buffer must be 16bpp mode\n");
-		exit(0);
-	}*/
-
 	close(fb);
 
 	return 0;
+}
+
+static int disp_set_addr(struct display_dev *pddev, struct video_dev *pvdev, uint32_t *addr)
+{
+	unsigned long arg[4];
+
+	__disp_video_fb_t  fb_addr;
+	memset(&fb_addr, 0, sizeof(__disp_video_fb_t));
+
+	fb_addr.interlace		= 0;
+	fb_addr.top_field_first = 0;
+	fb_addr.frame_rate		= 25;
+	fb_addr.addr[0] = *addr; //your Y address
+	fb_addr.addr[1] = *addr + pvdev->offset[0];//your C address
+	fb_addr.addr[2] = *addr + pvdev->offset[1];//your C address
+
+	fb_addr.id = 0;  //TODO
+
+	arg[0] = pddev->scn_index;
+	arg[1] = pddev->hlay;
+	arg[2] = (unsigned long)&fb_addr;
+	return ioctl(pddev->fd, DISP_CMD_VIDEO_SET_FB, (void*)arg);
 }
 
 static int video_start_cap(struct display_dev *pddev, struct video_dev *pvdev)
@@ -702,15 +548,6 @@ static int video_start_cap(struct display_dev *pddev, struct video_dev *pvdev)
 	 * buffers and display device will start displaying buffers from
 	 * the qneueued buffers */
 
-	/* Start Streaming. on display device */
-	a = V4L2_BUF_TYPE_VIDEO_OUTPUT;
-	ret = ioctl(pddev->fd, VIDIOC_STREAMON, &a);
-	if (ret < 0) {
-		LOG("display VIDIOC_STREAMON error\n");
-		return ret;
-	}
-	LOG("%s: Stream on...\n", DISPLAY_NAME);
-
 	/* Start Streaming. on capture device */
 	a = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	ret = ioctl(pvdev->fd, VIDIOC_STREAMON, &a);
@@ -719,11 +556,6 @@ static int video_start_cap(struct display_dev *pddev, struct video_dev *pvdev)
 		return ret;
 	}
 	LOG("%s: Stream on...\n", CAPTURE_NAME);
-
-	/* Set the display buffers for queuing and dqueueing operation */
-	pddev->display_buf.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
-	pddev->display_buf.index = 0;
-	pddev->display_buf.memory = V4L2_MEMORY_MMAP;
 
 	/* Set the capture buffers for queuing and dqueueing operation */
 	pvdev->capture_buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -736,9 +568,12 @@ static int video_start_cap(struct display_dev *pddev, struct video_dev *pvdev)
 static inline int video_cap_frame(struct display_dev *pddev, struct video_dev *pvdev)
 {
 	int ret;
-	int j,h;
-	unsigned char *cap_ptr, *dis_ptr, *cap_tmp;
-	unsigned int tmp;
+	struct v4l2_buffer buf;
+
+	memset(&buf, 0, sizeof(buf));
+	buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	buf.memory = V4L2_MEMORY_MMAP;
+
 #ifdef LOGTIME
 	struct timeval btime, ctime, ltime;
 
@@ -748,21 +583,8 @@ static inline int video_cap_frame(struct display_dev *pddev, struct video_dev *p
 #endif
 
 	pthread_testcancel();
-	/* Dequeue display buffer */
-	ret = ioctl(pddev->fd, VIDIOC_DQBUF, &pddev->display_buf);
-	if (ret < 0) {
-		LOG("Disp VIDIOC_DQBUF");
-		return ret;
-	}
-#ifdef LOGTIME
-	gettimeofday( &ctime, NULL );
-	LOG("DQ Disp: %ld\n", (ctime.tv_sec-btime.tv_sec)*1000000 + ctime.tv_usec-btime.tv_usec);
-	ltime = ctime;
-#endif
-
-	pthread_testcancel();
 	/* Dequeue capture buffer */
-	ret = ioctl(pvdev->fd, VIDIOC_DQBUF, &pvdev->capture_buf);
+	ret = ioctl(pvdev->fd, VIDIOC_DQBUF, &buf);
 	if (ret < 0) {
 		LOG("Cap VIDIOC_DQBUF");
 		return ret;
@@ -775,28 +597,8 @@ static inline int video_cap_frame(struct display_dev *pddev, struct video_dev *p
 	ltime = ctime;
 #endif
 
-	cap_ptr = (unsigned char*)pvdev->buff_info[pvdev->capture_buf.index].start;
-	dis_ptr = (unsigned char*)pddev->buff_info[pddev->display_buf.index].start;
+	disp_set_addr(pddev,pvdev,&buf.m.offset);
 
-	for (h = 0; h < pddev->height; h++){
-		cap_tmp = cap_ptr;
-		for(j = 0; j < (pddev->width>>1); j++){
-			tmp = cap_tmp[0];	//U
-			*dis_ptr++ = alaw_mapping_table[tmp];
-
-			tmp = cap_tmp[1];	//Y
-			*dis_ptr++ = alaw_mapping_table[tmp];
-
-			tmp = cap_tmp[2];	//V
-			*dis_ptr++ = alaw_mapping_table[tmp];
-
-			tmp = cap_tmp[(1<<(1+pddev->pix_step_mod.x))+1];	//Y
-			*dis_ptr++ = alaw_mapping_table[tmp];
-
-			cap_tmp += (1<<(2+pddev->pix_step_mod.x));
-		}
-		cap_ptr += (pvdev->bytesperline << pddev->pix_step_mod.y);
-	}
 #ifdef LOGTIME
 	gettimeofday( &ctime, NULL );
 	LOG("Process done: %ld(%ld)\n", 
@@ -806,7 +608,7 @@ static inline int video_cap_frame(struct display_dev *pddev, struct video_dev *p
 #endif
 
 	pthread_testcancel();
-	ret = ioctl(pvdev->fd, VIDIOC_QBUF, &pvdev->capture_buf);
+	ret = ioctl(pvdev->fd, VIDIOC_QBUF, &buf);
 	if (ret < 0) {
 		LOG("Cap VIDIOC_QBUF");
 		return ret;
@@ -819,19 +621,7 @@ static inline int video_cap_frame(struct display_dev *pddev, struct video_dev *p
 	ltime = ctime;
 #endif
 
-	pthread_testcancel();
-	ret = ioctl(pddev->fd, VIDIOC_QBUF, &pddev->display_buf);
-	if (ret < 0) {
-		LOG("Disp VIDIOC_QBUF");
-		return ret;
-	}
-	pthread_testcancel();
-#ifdef LOGTIME
-	gettimeofday( &ctime, NULL );
-	tmp = (ctime.tv_sec-btime.tv_sec)*1000000 + ctime.tv_usec-btime.tv_usec;
-	LOG("Q disp: %d(%ld), %dfps\n", 
-		tmp, (ctime.tv_sec-ltime.tv_sec)*1000000 + ctime.tv_usec-ltime.tv_usec, 1000000/tmp);
-#endif
+	disp_on(pddev);
 	return 0;
 }
 
@@ -839,13 +629,7 @@ static int video_stop_cap(struct display_dev *pddev, struct video_dev *pvdev)
 {
 	int a, ret;
 	
-	a = V4L2_BUF_TYPE_VIDEO_OUTPUT;
-	ret = ioctl(pddev->fd, VIDIOC_STREAMOFF, &a);
-	if (ret < 0) {
-		LOG("VIDIOC_STREAMOFF");
-		return ret;
-	}
-	LOG("\n%s: Stream off!!\n", DISPLAY_NAME);
+	LOG("\n%s: Stream off!!\n", CAPTURE_NAME);
 
 	a = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	ret = ioctl(pvdev->fd, VIDIOC_STREAMOFF, &a);
@@ -873,13 +657,13 @@ static void* Show_video(void* v)
 		return NULL;
 	}
 
-	if(initDisplay(DISPLAY_DEVICE, &fboverlydev)<0){
-		DPRINTF("Failed to open:%s\n", DISPLAY_DEVICE);
+	if(initDisplay(DISPLAYCTRL_DEVICE, &dispdev, &videodev)<0){
+		DPRINTF("Failed to open:%s\n", DISPLAYCTRL_DEVICE);
 		return NULL;
 	}
 
 	//start capture
-	if( video_start_cap(&fboverlydev, &videodev)<0){
+	if( video_start_cap(&dispdev, &videodev)<0){
 		return NULL;
 	}
 
@@ -887,11 +671,11 @@ static void* Show_video(void* v)
 		pthread_mutex_lock(&video_thd.mutex);
 		pthread_mutex_unlock(&video_thd.mutex);
 
-		if(video_cap_frame(&fboverlydev, &videodev)<0)
+		if(video_cap_frame(&dispdev, &videodev)<0)
 			break;
 	}
 
-	video_stop_cap(&fboverlydev, &videodev);
+	video_stop_cap(&dispdev, &videodev);
 	return NULL;
 }
 
@@ -925,14 +709,10 @@ int video_start(PVideo_st2 pvst)
 		return -1;
 	}
 
-	fboverlydev.xpos = pshow->x;
-	fboverlydev.ypos = pshow->y;
-	fboverlydev.xres = pshow->width;
-	fboverlydev.yres = pshow->height;
+	memcpy(&dispdev.scrn, pshow, sizeof(rect_st));
+	memcpy(&dispdev.crop, pcrop, sizeof(rect_st));
 
 	videodev.channel = video_thd.channel = pvst->channel;
-
-	memcpy(&videodev.crop, pcrop, sizeof(rect_st));
 
 	if(video_thd.video_running){
 		video_stop();
@@ -958,7 +738,7 @@ int video_stop(void)
 	}
 
 	video_close(&videodev);
-	display_close(&fboverlydev);
+	display_close(&dispdev);
 	pthread_mutex_destroy(&video_thd.mutex);
 
 	return 0;

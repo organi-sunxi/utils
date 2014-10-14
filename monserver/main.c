@@ -13,12 +13,14 @@
 
 #include <netinet/in.h> 
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <linux/sockios.h>
 #include <linux/if.h>
 #include <linux/can.h>
 #include <linux/can/raw.h>
 
 #include "mon-server.h"
+#include "up-can.h"
 #include "video.h"
 #include "enum.h"
 

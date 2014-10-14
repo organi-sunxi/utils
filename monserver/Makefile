@@ -1,5 +1,6 @@
 
-CC ?= arm-none-linux-gnueabi-
+KERNEL_PATH ?= ../../linux-sunxi
+CC = arm-none-linux-gnueabi-
 EXTRA_LIBS += -lpthread
 CFLAGS = -Wall
 LDFLAGS =
@@ -9,7 +10,7 @@ EXEC = monserver
 all: $(EXEC) client
 
 $(EXEC): main.c video.c enum.c
-	$(CC)gcc $^ $(LDFLAGS) $(CFLAGS) -o $@ $(EXTRA_LIBS)
+	$(CC)gcc $^ $(LDFLAGS) $(CFLAGS) -I$(KERNEL_PATH)/include -o $@ $(EXTRA_LIBS)
 	$(CC)strip $(EXEC)
 
 client: testclt.c monclient.c

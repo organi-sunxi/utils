@@ -5,8 +5,6 @@
 extern "C" {
 #endif
 
-#include "up-can.h"
-
 #define MONCMD_VIDEO			0
 #define MONCMD_CANBUS			1
 #define MONCMD_EXIT				0xffff
