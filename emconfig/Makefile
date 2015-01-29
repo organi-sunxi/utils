@@ -1,4 +1,7 @@
-CC ?= arm-none-linux-gnueabi-
+CROSS_COMPILE ?= arm-none-linux-gnueabi-
+CC ?= $(CROSS_COMPILE)gcc
+STRIP ?= $(CROSS_COMPILE)strip
+
 SRC = main.c command.c operator_lib.c operator_machine.c operator_app.c lib.c \
 	em5000.c em6000.c
 
@@ -8,14 +11,14 @@ DEP=$(SRC:.c=.dep)
 all: defaultenv.h $(OBJ) emconfig
 
 %.o: %.c
-	$(CC)gcc -c $(CFLAGS) $< -o $@
+	$(CC) -c $(CFLAGS) $< -o $@
 
 %.dep: %.c
-	$(CC)gcc -MM $(CFLAGS) $< > $@
+	$(CC) -MM $(CFLAGS) $< > $@
 
 emconfig:$(OBJ)
-	$(CC)gcc -o $@ $(OBJ)
-	$(CC)strip -s $@
+	$(CC) -o $@ $(OBJ)
+	$(STRIP) -s $@
 
 defaultenv.h:emconfig.conf
 	echo "#ifndef DEFAULTENV_H" > $@

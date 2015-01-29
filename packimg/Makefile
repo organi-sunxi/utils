@@ -1,6 +1,9 @@
 #!makefile
 
 CROSS_COMPILE ?=
+CC ?= $(CROSS_COMPILE)gcc
+STRIP ?= $(CROSS_COMPILE)strip
+
 CFLAGS=
 
 SRC=packimg_burn.c packimg.c unpackimg.c
@@ -9,11 +12,11 @@ OBJ=$(SRC:.c=.o)
 all: $(OBJ) packimg
 
 %.o: %.c
-	$(CROSS_COMPILE)gcc -c $(CFLAGS) $< -o $@
+	$(CC) -c $(CFLAGS) $< -o $@
 
 packimg:$(OBJ)
-	$(CROSS_COMPILE)gcc -o $@ $(OBJ)
-	$(CROSS_COMPILE)strip -s $@
+	$(CC) -o $@ $(OBJ)
+	$(STRIP) -s $@
 	rm -f unpackimg && ln -s packimg unpackimg
 	rm -f packimg_burn && ln -s packimg packimg_burn
 
