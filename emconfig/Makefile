@@ -18,7 +18,7 @@ all: defaultenv.h $(OBJ) emconfig
 
 emconfig:$(OBJ)
 	$(CC) -o $@ $(OBJ)
-#	$(STRIP) -s $@
+	$(STRIP) -s $@
 
 defaultenv.h:emconfig.conf
 	echo "#ifndef DEFAULTENV_H" > $@

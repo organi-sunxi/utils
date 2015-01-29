@@ -16,7 +16,7 @@ all: $(OBJ) packimg
 
 packimg:$(OBJ)
 	$(CC) -o $@ $(OBJ)
-#	$(STRIP) -s $@
+	$(STRIP) -s $@
 	rm -f unpackimg && ln -s packimg unpackimg
 	rm -f packimg_burn && ln -s packimg packimg_burn
 
