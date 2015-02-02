@@ -10,7 +10,7 @@ int startup_begin(void);
 int startup_end(startup_child_func pf);
 
 #else
-#define startup_begin(c,v)
+#define startup_begin()
 #define startup_end(pf)	(*pf)()
 
 #endif
