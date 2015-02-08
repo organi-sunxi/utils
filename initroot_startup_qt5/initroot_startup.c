@@ -53,7 +53,7 @@ static void vfsumount()
 
 	umount2("/sys", MNT_DETACH);
 //	umount2("/dev", MNT_DETACH);
-	umount2("/data", MNT_DETACH);
+//	umount2("/data", MNT_DETACH);
 //	umount2("/", MNT_DETACH);
 }
 
@@ -156,7 +156,7 @@ static void SetQtEnv()
 	setenv("QT_QPA_EGLFS_HIDECURSOR", "1", 1);
 	setenv("QT_QPA_EGLFS_DISABLE_INPUT", "1", 1);
 
-	setenv("QT_QWS_FONTDIR", "/usr/qt4/lib/fonts", 1);
+	setenv("QT_QPA_FONTDIR", "/usr/lib/fonts", 1);
 	setenv("FRAMEBUFFER", FBDEV, 1);
 #if 0
 	setenv("LANG", "zh_CN", 1);
