@@ -1,21 +1,28 @@
 
 #CC=arm-linux-gnueabi-
-CC := arm-linux-
+CROSS_COMPILE ?= arm-linux-
+CC = $(CROSS_COMPILE)gcc
+CXX = $(CROSS_COMPILE)g++
+STRIP = $(CROSS_COMPILE)strip
+AR = $(CROSS_COMPILE)ar
 CFLAGS=-DINITROOT_STARTUP
 LDFLAGS=-static
 
-EXEC= initroot_startup
+EXEC = initroot_startup
+LIB = lib$(EXEC).a
 
-all: $(EXEC) main
+all: $(LIB) init
 
-$(EXEC): initroot_startup.c initroot_startup.h
-	$(CC)gcc $(EXEC).c $(LDFLAGS) $(CFLAGS) -c -o $(EXEC).o
-	cp $(EXEC).o lib$(EXEC).a
-#	$(CC)ar c lib$(EXEC).a $(EXEC).o
+$(LIB): $(EXEC).c $(EXEC).h
+	$(CC) $(EXEC).c $(LDFLAGS) $(CFLAGS) -c -o $(EXEC).o
+	$(AR) cr $(LIB) $(EXEC).o
 
-main: main.cpp
-	$(CC)g++ main.cpp $(LDFLAGS) $(CFLAGS) -o init -linitroot_startup -L./
-	$(CC)strip -S init
+init: main.cpp
+	$(CXX) $< $(LDFLAGS) $(CFLAGS) -o $@ -l$(EXEC) -L./
+
+install: $(LIB)
+	install -d $(DESTDIR)/usr/lib
+	install -m 755 $(LIB) $(DESTDIR)/usr/lib
 
 clean:
-	rm -f *.o $(EXEC) *.a init
+	rm -f *.o *.a init
