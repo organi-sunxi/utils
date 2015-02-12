@@ -5,8 +5,8 @@ CC = $(CROSS_COMPILE)gcc
 CXX = $(CROSS_COMPILE)g++
 STRIP = $(CROSS_COMPILE)strip
 AR = $(CROSS_COMPILE)ar
-CFLAGS=-DINITROOT_STARTUP
-LDFLAGS=-static
+CFLAGS += -DINITROOT_STARTUP
+LDFLAGS += -static
 
 EXEC = initroot_startup
 LIB = lib$(EXEC).a
@@ -14,7 +14,7 @@ LIB = lib$(EXEC).a
 all: $(LIB) init
 
 $(LIB): $(EXEC).c $(EXEC).h
-	$(CC) $(EXEC).c $(LDFLAGS) $(CFLAGS) -c -o $(EXEC).o
+	$(CC) $(EXEC).c $(CFLAGS) -c -o $(EXEC).o
 	$(AR) cr $(LIB) $(EXEC).o
 
 init: main.cpp
