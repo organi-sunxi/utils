@@ -15,6 +15,7 @@ static void print_usage(char *cmd)
 {
 	printf("Usage: %s [option] file@loadaddr [file@loadaddr] ... [file@loadaddr] output\n"
 		"\t\t-p <pagesize>\n"
+		"\t\t-n don't align file size\n"
 		"\t\t-d <mtd device> default /dev/mtd0\n", cmd);
 }
 
@@ -26,9 +27,9 @@ int packimg_main(int argc, char **argv)
 	int header_size, nentry, offset, pagesize=0;
 	char **buffer, *end, *dev_name="/dev/mtd0";
 	mtd_info_t mtd_info;
-	int i;
+	int i, no_align = 0;
 
-	while ((i = getopt(argc, argv, "hd:p:")) != -1) {
+	while ((i = getopt(argc, argv, "hnd:p:")) != -1) {
 		switch(i) {
 		case 'd':
 			dev_name = optarg;
@@ -39,6 +40,9 @@ int packimg_main(int argc, char **argv)
 				fprintf(stderr, "pagesize invalid %s\n", optarg);
 				return -1;
 			}
+			break;
+		case 'n':
+			no_align = 1;
 			break;
 		case 'h':
 		default:
@@ -107,10 +111,12 @@ int packimg_main(int argc, char **argv)
 		}
 
 		fseek(fin, 0, SEEK_END);
-		pe[i].size = (ftell(fin) + 3) & ~3;
+		pe[i].size = ftell(fin);
 		fseek(fin, 0, SEEK_SET);
+		if (!no_align)
+			pe[i].size = (pe[i].size + 3) & ~3;
 
-		buffer[i] = malloc(pe[i].size);
+		buffer[i] = calloc((pe[i].size + 3) & ~3, 1);
 		if (buffer[i] == NULL) {
 			perror("alloc file buffer fail\n");
 			return -1;

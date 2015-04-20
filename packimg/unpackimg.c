@@ -81,7 +81,7 @@ static int dump_pack_once(int fd, loff_t noffs)
 		}
 
 		size = pen[i].size;
-		p = malloc(size);
+		p = calloc((size + 3) & ~3, 1);
 		if(read(fd, p, size)!=size){
 			fprintf(stderr, "end of device when read pack %d\n", i);
 			free(p);
