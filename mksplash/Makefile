@@ -1,6 +1,6 @@
 CROSS_COMPILE ?= 
-CC ?= $(CROSS_COMPILE)gcc
-STRIP ?= $(CROSS_COMPILE)strip
+CC := $(CROSS_COMPILE)gcc
+STRIP := $(CROSS_COMPILE)strip
 
 all: mksplash
 

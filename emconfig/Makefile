@@ -1,6 +1,6 @@
 CROSS_COMPILE ?= arm-none-linux-gnueabi-
-CC ?= $(CROSS_COMPILE)gcc
-STRIP ?= $(CROSS_COMPILE)strip
+CC := $(CROSS_COMPILE)gcc
+STRIP := $(CROSS_COMPILE)strip
 
 SRC = main.c command.c operator_lib.c operator_machine.c operator_app.c lib.c \
 	em5000.c em6000.c
@@ -28,4 +28,4 @@ defaultenv.h:emconfig.conf
 	printf "\n#endif\n" >> $@
 
 clean:
-	rm -f *.o defaultenv.h *.dep
+	rm -f *.o defaultenv.h *.dep emconfig

@@ -1,8 +1,8 @@
 
 KERNEL_PATH ?= ../../linux-sunxi
 CROSS_COMPILE ?= arm-none-linux-gnueabi-
-CC ?= $(CROSS_COMPILE)gcc
-STRIP ?= $(CROSS_COMPILE)strip
+CC := $(CROSS_COMPILE)gcc
+STRIP := $(CROSS_COMPILE)strip
 
 EXTRA_LIBS += -lpthread
 CFLAGS = -Wall
